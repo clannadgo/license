@@ -80,7 +80,7 @@ func main() {
 	}
 	metaStr, err := json.Marshal(meta)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "json marshal meta error: %v\n", err)
+		fmt.Println(os.Stderr, "json marshal meta error: %v\n", err)
 		os.Exit(8)
 	}
 	param := &licenseParam{
@@ -103,7 +103,7 @@ func main() {
 	if strings.Contains(param.fingerprint, "-") {
 		h, err := decodeActivationCodeToHex(param.fingerprint)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to decode activation code: %v\n", err)
+			fmt.Println(os.Stderr, "failed to decode activation code: %v\n", err)
 			os.Exit(3)
 		}
 		fp = h
@@ -111,7 +111,7 @@ func main() {
 
 	priv, err := loadPrivateKey(param.privPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to load private key: %v\n", err)
+		fmt.Println(os.Stderr, "failed to load private key: %v\n", err)
 		os.Exit(4)
 	}
 
@@ -132,7 +132,7 @@ func main() {
 	if param.metaStr != "" {
 		var metaObj map[string]interface{}
 		if err = json.Unmarshal([]byte(param.metaStr), &metaObj); err != nil {
-			fmt.Fprintf(os.Stderr, "invalid meta json: %v\n", err)
+			fmt.Println(os.Stderr, "invalid meta json: %v\n", err)
 			os.Exit(5)
 		}
 		payload["meta"] = metaObj
@@ -141,7 +141,7 @@ func main() {
 	// marshal payload
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "json marshal payload error: %v\n", err)
+		fmt.Println(os.Stderr, "json marshal payload error: %v\n", err)
 		os.Exit(6)
 	}
 
@@ -149,24 +149,24 @@ func main() {
 	signerOpts := (&jose.SignerOptions{}).WithType("JWT")
 	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.PS256, Key: priv}, signerOpts)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create signer: %v\n", err)
+		fmt.Println(os.Stderr, "failed to create signer: %v\n", err)
 		os.Exit(7)
 	}
 
 	jws, err := signer.Sign(payloadBytes)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to sign payload: %v\n", err)
+		fmt.Println(os.Stderr, "failed to sign payload: %v\n", err)
 		os.Exit(8)
 	}
 
 	compact, err := jws.CompactSerialize()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to serialize jws: %v\n", err)
+		fmt.Println(os.Stderr, "failed to serialize jws: %v\n", err)
 		os.Exit(9)
 	}
 
 	if err = os.WriteFile(param.out, []byte(compact), 0600); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to write output: %v\n", err)
+		fmt.Println(os.Stderr, "failed to write output: %v\n", err)
 		os.Exit(10)
 	}
 
