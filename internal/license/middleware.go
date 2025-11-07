@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -131,7 +132,7 @@ func ActivateHandler(pubKeyPath, storePath string) gin.HandlerFunc {
 		}
 
 		// persist license
-		if err := ioutil.WriteFile(storePath, []byte(req.License), 0600); err != nil {
+		if err := os.WriteFile(storePath, []byte(req.License), 0600); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "save failed"})
 			return
 		}

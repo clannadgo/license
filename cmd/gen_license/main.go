@@ -1,4 +1,3 @@
-// cmd/gen-license/main.go
 package main
 
 import (
@@ -10,7 +9,6 @@ import (
 	"encoding/pem"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -35,7 +33,7 @@ type licenseParam struct {
 
 // loadPrivateKey 支持 PKCS1 和 PKCS8 格式
 func loadPrivateKey(path string) (*rsa.PrivateKey, error) {
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +75,8 @@ func decodeActivationCodeToHex(code string) (string, error) {
 
 func main() {
 	meta := map[string]interface{}{
-		"plan": "enterprise",
+		"name":    name,
+		"version": version,
 	}
 	metaStr, err := json.Marshal(meta)
 	if err != nil {
@@ -116,7 +115,8 @@ func main() {
 		os.Exit(4)
 	}
 
-	exp := time.Now().UTC().Add(time.Duration(param.days) * 24 * time.Hour).Unix()
+	//exp := time.Now().UTC().Add(time.Duration(param.days) * 24 * time.Hour).Unix()
+	exp := time.Now().UTC().Add(time.Duration(60) * time.Second).Unix() // 测试60秒过期
 
 	// build payload (claims). Use explicit map to avoid ordering issues; jose will sign payload bytes.
 	payload := map[string]interface{}{
@@ -131,7 +131,7 @@ func main() {
 	// optional meta
 	if param.metaStr != "" {
 		var metaObj map[string]interface{}
-		if err := json.Unmarshal([]byte(param.metaStr), &metaObj); err != nil {
+		if err = json.Unmarshal([]byte(param.metaStr), &metaObj); err != nil {
 			fmt.Fprintf(os.Stderr, "invalid meta json: %v\n", err)
 			os.Exit(5)
 		}
@@ -165,7 +165,7 @@ func main() {
 		os.Exit(9)
 	}
 
-	if err := ioutil.WriteFile(param.out, []byte(compact), 0600); err != nil {
+	if err = os.WriteFile(param.out, []byte(compact), 0600); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to write output: %v\n", err)
 		os.Exit(10)
 	}

@@ -63,8 +63,7 @@ func GetFingerprint() string {
 	return code
 }
 
-// ToActivationCode 将指纹（hex 或 raw bytes）转成 16-char base32 激活码 "XXXX-XXXX-XXXX-XXXX"
-// 输入可为 hex string（如 sha256 hex）或任意字节 slice（请使用 ToActivationCodeFromBytes）
+// ToActivationCodeFromHex 将指纹（hex 或 raw bytes）转成 16-char base32 激活码 "XXXX-XXXX-XXXX-XXXX"
 func ToActivationCodeFromHex(hexStr string) (string, error) {
 	b, err := hex.DecodeString(strings.TrimSpace(hexStr))
 	if err != nil {
