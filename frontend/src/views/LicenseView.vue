@@ -147,11 +147,6 @@
             </template>
           </el-input>
         </div>
-        <div class="fingerprint-format" :class="{ 'format-valid': validateFingerprintFormat(currentFingerprint), 'format-invalid': !validateFingerprintFormat(currentFingerprint) }">
-          <el-icon v-if="validateFingerprintFormat(currentFingerprint)" style="color: #67C23A; margin-right: 5px;"><Check /></el-icon>
-          <el-icon v-else style="color: #F56C6C; margin-right: 5px;"><Close /></el-icon>
-          格式校验：{{ validateFingerprintFormat(currentFingerprint) ? '正确' : '不正确' }}
-        </div>
         <div class="fingerprint-tip">
           <el-alert
             title="提示"
@@ -440,12 +435,6 @@ const generateFingerprint = async () => {
     const response = await axios.get(`${API_BASE_URL}/system/fingerprint`)
     if (response.data && response.data.fingerprint) {
       currentFingerprint.value = response.data.fingerprint
-      
-      // 验证指纹格式
-      if (!validateFingerprintFormat(currentFingerprint.value)) {
-        ElMessage.warning('生成的指纹格式可能不正确，请检查')
-      }
-      
       showFingerprintDialog.value = true
     } else {
       ElMessage.error('获取指纹失败')
