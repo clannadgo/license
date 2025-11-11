@@ -331,8 +331,11 @@ onMounted(() => {
   padding: 20px;
   width: 100%;
   margin: 0;
-  min-height: 100vh;
+  height: 100vh; /* 改为固定高度，铺满整个视口 */
+  display: flex;
+  flex-direction: column;
   background-color: #f5f7fa;
+  box-sizing: border-box; /* 确保padding包含在高度内 */
 }
 
 .header {
@@ -366,12 +369,14 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  flex: 1; /* 填充剩余空间 */
 }
 
 .content-row {
   display: flex;
   gap: 24px;
   align-items: stretch; /* 改为stretch使子元素高度一致 */
+  flex: 1; /* 填充剩余空间 */
 }
 
 .license-chart-small {
@@ -384,6 +389,7 @@ h1 {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
+  min-height: 0; /* 确保flex子元素可以缩小 */
 }
 
 .license-chart-small:hover {
@@ -413,11 +419,13 @@ h1 {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0; /* 确保flex子元素可以缩小 */
 }
 
 .table-container {
   flex: 1; /* 表格容器填充剩余空间 */
   overflow: auto; /* 添加滚动条以防内容过多 */
+  min-height: 0; /* 确保flex子元素可以缩小 */
 }
 
 .pagination-container {
