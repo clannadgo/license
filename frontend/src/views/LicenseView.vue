@@ -200,7 +200,8 @@ const newLicense = ref({
   validityHours: 0,
   validityMinutes: 0,
   validitySeconds: 0,
-  description: ''
+  description: '',
+  licenseContent: ''
 })
 
 // 日期格式化函数
@@ -342,8 +343,7 @@ const addLicense = async () => {
     }
     
     // 首先激活License
-    const activateResponse = await axios.post(`${API_BASE_URL}/license/activate`, {
-      license: newLicense.value.licenseContent,
+    const requestData = {
       customer: newLicense.value.customer,
       fingerprint: newLicense.value.fingerprint,
       description: newLicense.value.description,
@@ -351,7 +351,14 @@ const addLicense = async () => {
       validityHours: newLicense.value.validityHours,
       validityMinutes: newLicense.value.validityMinutes,
       validitySeconds: newLicense.value.validitySeconds
-    })
+    }
+    
+    // 只有当licenseContent不为空时才添加到请求中
+    if (newLicense.value.licenseContent) {
+      requestData.license = newLicense.value.licenseContent
+    }
+    
+    const activateResponse = await axios.post(`${API_BASE_URL}/license/activate`, requestData)
     
     if (activateResponse.data.success) {
       ElMessage.success('License添加成功')
@@ -366,7 +373,8 @@ const addLicense = async () => {
         validityHours: 0,
         validityMinutes: 0,
         validitySeconds: 0,
-        description: ''
+        description: '',
+        licenseContent: ''
       }
       // 刷新列表
       fetchLicenseList()
