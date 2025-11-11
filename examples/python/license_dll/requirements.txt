@@ -1,0 +1,8 @@
+# License DLL Python SDK Requirements
+
+# No external dependencies required for basic functionality
+# Only uses Python standard library: ctypes, os, sys, typing, json, datetime, time
+
+# Optional dependencies for testing:
+# pytest>=7.0.0
+# pytest-cov>=4.0.0
