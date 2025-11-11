@@ -6,10 +6,6 @@ import { RouterLink, RouterView } from 'vue-router'
   <header>
     <div class="wrapper">
       <h1 class="title">License管理系统</h1>
-      <nav>
-        <RouterLink to="/">License管理</RouterLink>
-        <RouterLink to="/about">关于</RouterLink>
-      </nav>
     </div>
   </header>
 
