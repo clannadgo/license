@@ -126,18 +126,18 @@ const formatDate = (dateString) => {
 // API基础URL
 const API_BASE_URL = 'http://localhost:8080/api'
 
-// 初始化图表
-const initChart = () => {
-  const chartDom = document.getElementById('licenseChart')
-  if (chartDom) {
-    chartInstance.value = echarts.init(chartDom)
-    updateChart()
-  }
-}
-
 // 更新图表数据
 const updateChart = () => {
-  if (!chartInstance.value) return
+  // 销毁旧实例并重新创建，避免type变化的冲突
+  if (chartInstance.value) {
+    chartInstance.value.dispose()
+    chartInstance.value = null
+  }
+  
+  const chartDom = document.getElementById('licenseChart')
+  if (!chartDom) return
+  
+  chartInstance.value = echarts.init(chartDom)
   
   // 计算统计数据
   const totalCount = licenseList.value.length
@@ -284,18 +284,18 @@ const refreshData = () => {
 
 
 
-// 初始化分页图表
-const initPaginationChart = () => {
-  const chartDom = document.getElementById('paginationChart')
-  if (chartDom) {
-    paginationChartInstance.value = echarts.init(chartDom)
-    updatePaginationChart()
-  }
-}
-
 // 更新分页图表
 const updatePaginationChart = () => {
-  if (!paginationChartInstance.value) return
+  // 销毁旧实例并重新创建，避免type变化的冲突
+  if (paginationChartInstance.value) {
+    paginationChartInstance.value.dispose()
+    paginationChartInstance.value = null
+  }
+  
+  const chartDom = document.getElementById('paginationChart')
+  if (!chartDom) return
+  
+  paginationChartInstance.value = echarts.init(chartDom)
   
   const totalPages = Math.ceil(total.value / pageSize.value)
   const pageSizes = [10, 20, 50, 100]
@@ -589,7 +589,7 @@ const updatePaginationChart = () => {
     ]
   }
   
-  paginationChartInstance.value.setOption(option, { replace: true })
+  paginationChartInstance.value.setOption(option)
 }
 
 // 分页变化处理
@@ -602,17 +602,18 @@ const handlePageChange = (page, size) => {
 // 组件挂载时初始化
 onMounted(() => {
   fetchLicenseList(currentPage.value, pageSize.value)
-  initChart()
-  initPaginationChart()
   
   // 窗口大小变化时重新渲染图表
   window.addEventListener('resize', () => {
-    if (chartInstance.value) {
-      chartInstance.value.resize()
-    }
-    if (paginationChartInstance.value) {
-      paginationChartInstance.value.resize()
-    }
+    // 使用setTimeout避免在main process期间调用resize
+    setTimeout(() => {
+      if (chartInstance.value && !chartInstance.value.isDisposed()) {
+        chartInstance.value.resize()
+      }
+      if (paginationChartInstance.value && !paginationChartInstance.value.isDisposed()) {
+        paginationChartInstance.value.resize()
+      }
+    }, 0)
   })
 })
 </script>
