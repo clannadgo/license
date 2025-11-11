@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"license/internal/config"
@@ -82,7 +83,7 @@ func main() {
 		// 许可证激活端点
 		api.POST("/license/activate", license.ActivateHandler(pubKeyPath, privateKeyPath, db))
 
-		// 获取所有许可证激活记录（支持分页）
+		// 获取所有许可证激活记录（支持分页和客户名称搜索）
 		api.GET("/license/activations", func(c *gin.Context) {
 			// 获取分页参数
 			page := 1
@@ -100,8 +101,11 @@ func main() {
 				}
 			}
 
-			// 使用分页查询
-			activations, total, err := db.GetLicenseActivationsWithPagination(page, pageSize)
+			// 获取客户名称搜索参数
+			customerName := c.Query("customer")
+
+			// 使用分页和搜索查询
+			activations, total, err := db.GetLicenseActivationsWithPaginationAndSearch(page, pageSize, customerName)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get activations"})
 				return
@@ -112,6 +116,7 @@ func main() {
 				"total":       total,
 				"page":        page,
 				"pageSize":    pageSize,
+				"customer":    customerName,
 			})
 		})
 
@@ -169,6 +174,45 @@ func main() {
 			})
 		})
 
+		// 更新许可证激活记录（只允许更新客户名称和描述）
+		api.PUT("/license/activations/:id", func(c *gin.Context) {
+			idStr := c.Param("id")
+			id, err := strconv.Atoi(idStr)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid license id"})
+				return
+			}
+
+			// 解析请求体
+			var request struct {
+				Customer    string `json:"customer" binding:"required"`
+				Description string `json:"description"`
+			}
+
+			if err := c.ShouldBindJSON(&request); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			// 验证客户名称不为空
+			if strings.TrimSpace(request.Customer) == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "customer name cannot be empty"})
+				return
+			}
+
+			// 更新许可证记录
+			err = db.UpdateLicenseActivation(id, request.Customer, request.Description)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{
+				"success": true,
+				"message": "License updated successfully",
+			})
+		})
+
 		// 下载许可证文件
 		api.GET("/license/activations/:id/download", func(c *gin.Context) {
 			idStr := c.Param("id")
@@ -192,7 +236,7 @@ func main() {
 
 			// 返回许可证内容
 			c.JSON(http.StatusOK, gin.H{
-				"success": true,
+				"success":        true,
 				"licenseContent": activation.License,
 			})
 		})

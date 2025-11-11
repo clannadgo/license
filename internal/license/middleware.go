@@ -196,15 +196,20 @@ func ActivateHandler(pubKeyPath, privateKeyPath string, db *database.DB) gin.Han
 			return
 		}
 
-		// 将指纹转换为hex格式
+		// 使用前端传入的原始fingerprint，不进行任何转换
 		fp := req.Fingerprint
+
+		// 如果fingerprint是带连字符的格式，转换为hex格式用于生成license
+		var fpForLicense string
 		if strings.Contains(req.Fingerprint, "-") {
 			h, err := DecodeActivationCodeToHex(req.Fingerprint)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "failed to decode fingerprint: " + err.Error()})
 				return
 			}
-			fp = h
+			fpForLicense = h
+		} else {
+			fpForLicense = req.Fingerprint
 		}
 
 		// 计算过期时间
@@ -217,7 +222,7 @@ func ActivateHandler(pubKeyPath, privateKeyPath string, db *database.DB) gin.Han
 		).Unix()
 
 		// 生成新的license
-		newLicense, err := generateLicense(pubKeyPath, privateKeyPath, req.Customer, fp, now, exp)
+		newLicense, err := generateLicense(pubKeyPath, privateKeyPath, req.Customer, fpForLicense, now, exp)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate license: " + err.Error()})
 			return

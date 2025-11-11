@@ -53,7 +53,7 @@ func NewDB(dbPath string) (*DB, error) {
 // StartExpiredLicenseChecker 启动一个协程，定期检查并更新过期的许可证
 func (db *DB) StartExpiredLicenseChecker() {
 	go func() {
-		ticker := time.NewTicker(5 * time.Second)
+		ticker := time.NewTicker(3 * time.Second)
 		defer ticker.Stop()
 
 		for {
@@ -342,6 +342,11 @@ func (db *DB) GetLicenseActivationByID(id int64) (*LicenseActivation, error) {
 
 // GetLicenseActivationsWithPagination 分页获取许可证激活记录
 func (db *DB) GetLicenseActivationsWithPagination(page, pageSize int) ([]LicenseActivation, int64, error) {
+	return db.GetLicenseActivationsWithPaginationAndSearch(page, pageSize, "")
+}
+
+// GetLicenseActivationsWithPaginationAndSearch 分页获取许可证激活记录，支持按客户名称模糊搜索
+func (db *DB) GetLicenseActivationsWithPaginationAndSearch(page, pageSize int, customerName string) ([]LicenseActivation, int64, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -351,10 +356,26 @@ func (db *DB) GetLicenseActivationsWithPagination(page, pageSize int) ([]License
 
 	offset := (page - 1) * pageSize
 
+	// 构建查询条件
+	var whereClause string
+	var countWhereClause string
+	var args []interface{}
+	var countArgs []interface{}
+
+	if customerName != "" {
+		whereClause = "WHERE is_delete = 0 AND customer LIKE ?"
+		countWhereClause = "WHERE is_delete = 0 AND customer LIKE ?"
+		args = append(args, "%"+customerName+"%")
+		countArgs = append(countArgs, "%"+customerName+"%")
+	} else {
+		whereClause = "WHERE is_delete = 0"
+		countWhereClause = "WHERE is_delete = 0"
+	}
+
 	// 查询总数
 	var total int64
-	totalQuery := `SELECT COUNT(*) FROM license_activations WHERE is_delete = 0`
-	err := db.conn.QueryRow(totalQuery).Scan(&total)
+	totalQuery := `SELECT COUNT(*) FROM license_activations ` + countWhereClause
+	err := db.conn.QueryRow(totalQuery, countArgs...).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count license activations: %v", err)
 	}
@@ -363,12 +384,13 @@ func (db *DB) GetLicenseActivationsWithPagination(page, pageSize int) ([]License
 	query := `
 	SELECT id, customer, fingerprint, license, description, issued_at, expires_at, activated_at, is_active, is_delete
 	FROM license_activations
-	WHERE is_delete = 0
+	` + whereClause + `
 	ORDER BY activated_at DESC
 	LIMIT ? OFFSET ?
 	`
 
-	rows, err := db.conn.Query(query, pageSize, offset)
+	queryArgs := append(args, pageSize, offset)
+	rows, err := db.conn.Query(query, queryArgs...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to query license activations with pagination: %v", err)
 	}
@@ -553,6 +575,27 @@ func (db *DB) DeleteLicenseActivation(id int) error {
 	result, err := db.conn.Exec(query, id)
 	if err != nil {
 		return fmt.Errorf("failed to soft delete license activation: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %v", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no license activation found with id %d", id)
+	}
+
+	return nil
+}
+
+// UpdateLicenseActivation 更新许可证激活记录（只允许更新客户名称和描述）
+func (db *DB) UpdateLicenseActivation(id int, customer, description string) error {
+	query := `UPDATE license_activations SET customer = ?, description = ? WHERE id = ? AND is_delete = 0`
+
+	result, err := db.conn.Exec(query, customer, description, id)
+	if err != nil {
+		return fmt.Errorf("failed to update license activation: %v", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()

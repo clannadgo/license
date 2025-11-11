@@ -10,6 +10,8 @@
       <el-button @click="refreshData">刷新数据</el-button>
     </div>
 
+
+
     <div class="license-content">
       <div class="content-row">
         <!-- License统计图表 - 小模块 -->
@@ -21,6 +23,21 @@
         <div class="license-table">
           <div class="table-header">
             <h3>License列表</h3>
+            <!-- 搜索区域 -->
+            <div class="search-container">
+              <el-input
+                v-model="searchKeyword"
+                placeholder="请输入客户名称进行搜索"
+                class="search-input"
+                clearable
+                @keyup.enter="handleSearch"
+                @clear="handleSearch"
+              >
+                <template #append>
+                  <el-button @click="handleSearch" type="primary">搜索</el-button>
+                </template>
+              </el-input>
+            </div>
           </div>
           <div class="table-container">
             <el-table :data="licenseList" style="width: 100%" table-layout="fixed">
@@ -45,14 +62,17 @@
               <el-table-column prop="is_active" label="状态" width="100">
                 <template #default="scope">
                   <el-tag :type="scope.row.is_active ? 'success' : 'danger'">
-                    {{ scope.row.is_active ? '激活' : '停用' }}
+                    {{ scope.row.is_active ? '已激活' : '已过期' }}
                   </el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="150">
+              <el-table-column label="操作" width="200">
                 <template #default="scope">
                   <el-button size="small" type="primary" @click="downloadLicense(scope.row.id)">
                     下载
+                  </el-button>
+                  <el-button size="small" type="warning" @click="openEditDialog(scope.row)">
+                    编辑
                   </el-button>
                   <el-button size="small" type="danger" @click="deleteLicense(scope.row.id)">
                     删除
@@ -147,6 +167,27 @@
       </template>
     </el-dialog>
 
+    <!-- 编辑License对话框 -->
+    <el-dialog v-model="showEditDialog" title="编辑License" width="600px">
+      <el-form :model="editLicense" label-width="80px">
+        <el-form-item label="客户名称" required>
+          <el-input v-model="editLicense.customer" placeholder="请输入客户名称" />
+        </el-form-item>
+        <el-form-item label="机器码">
+          <el-input v-model="editLicense.fingerprint" readonly disabled />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="editLicense.description" type="textarea" rows="4" placeholder="请输入描述内容" maxlength="300" show-word-limit />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showEditDialog = false">取消</el-button>
+          <el-button type="primary" @click="updateLicense">确定</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
     <!-- 指纹生成对话框 -->
     <el-dialog v-model="showFingerprintDialog" title="机器码" width="500px">
       <div class="fingerprint-content">
@@ -187,6 +228,7 @@ import axios from 'axios'
 // 数据定义
 const licenseList = ref([])
 const showAddDialog = ref(false)
+const showEditDialog = ref(false)
 const showFingerprintDialog = ref(false)
 const currentFingerprint = ref('')
 const chartInstance = ref(null)
@@ -196,6 +238,7 @@ const pageSize = ref(10)
 const showFingerprintValidation = ref(false)
 const showFingerprintTooltip = ref(false)
 const fingerprintTooltipContent = ref('')
+const searchKeyword = ref('') // 搜索关键词
 
 const newLicense = ref({
   customer: '',
@@ -206,6 +249,13 @@ const newLicense = ref({
   validitySeconds: 0,
   description: '',
   licenseContent: ''
+})
+
+const editLicense = ref({
+  id: '',
+  customer: '',
+  fingerprint: '',
+  description: ''
 })
 
 // 日期格式化函数
@@ -281,13 +331,20 @@ const updateChart = () => {
 }
 
 // 获取License列表
-const fetchLicenseList = async (page = 1, size = 10) => {
+const fetchLicenseList = async (page = 1, size = 10, keyword = '') => {
   try {
+    const params = {
+      page,
+      size
+    }
+    
+    // 如果有搜索关键词，添加到参数中
+    if (keyword) {
+      params.customer = keyword
+    }
+    
     const response = await axios.get(`${API_BASE_URL}/license/activations`, {
-      params: {
-        page,
-        size
-      }
+      params
     })
     
     // 处理后端返回的数据
@@ -375,8 +432,8 @@ const addLicense = async () => {
         description: '',
         licenseContent: ''
       }
-      // 刷新列表
-      fetchLicenseList()
+      // 刷新列表，保留搜索关键词
+      fetchLicenseList(currentPage.value, pageSize.value, searchKeyword.value)
     } else {
       ElMessage.error(activateResponse.data.message || 'License添加失败')
     }
@@ -402,8 +459,8 @@ const deactivateLicense = async (id) => {
     
     if (response.data.success) {
       ElMessage.success('License停用成功')
-      // 刷新列表
-      fetchLicenseList(currentPage.value, pageSize.value)
+      // 刷新列表，保留搜索关键词
+      fetchLicenseList(currentPage.value, pageSize.value, searchKeyword.value)
     } else {
       ElMessage.error('License停用失败')
     }
@@ -428,8 +485,8 @@ const deleteLicense = async (id) => {
     
     if (response.data.success) {
       ElMessage.success('License删除成功')
-      // 刷新列表
-      fetchLicenseList(currentPage.value, pageSize.value)
+      // 刷新列表，保留搜索关键词
+      fetchLicenseList(currentPage.value, pageSize.value, searchKeyword.value)
     } else {
       ElMessage.error('License删除失败')
     }
@@ -470,7 +527,7 @@ const downloadLicense = async (id) => {
 
 // 刷新数据
 const refreshData = () => {
-  fetchLicenseList(currentPage.value, pageSize.value)
+  fetchLicenseList(currentPage.value, pageSize.value, searchKeyword.value)
   ElMessage.success('数据已刷新')
 }
 
@@ -544,22 +601,70 @@ const copyFingerprint = () => {
 
 
 
+// 显示编辑对话框
+const openEditDialog = (row) => {
+  editLicense.value = {
+    id: row.id,
+    customer: row.customer,
+    fingerprint: row.fingerprint,
+    description: row.description || ''
+  }
+  showEditDialog.value = true
+}
+
+// 更新License
+const updateLicense = async () => {
+  try {
+    // 验证客户名称必填
+    if (!editLicense.value.customer || editLicense.value.customer.trim() === '') {
+      ElMessage.error('客户名称不能为空')
+      return
+    }
+    
+    // 调用后端API更新License
+    const response = await axios.put(`${API_BASE_URL}/license/activations/${editLicense.value.id}`, {
+      customer: editLicense.value.customer,
+      description: editLicense.value.description
+    })
+    
+    if (response.data.success) {
+      ElMessage.success('License更新成功')
+      showEditDialog.value = false
+      // 刷新列表，保留搜索关键词
+      fetchLicenseList(currentPage.value, pageSize.value, searchKeyword.value)
+    } else {
+      ElMessage.error('License更新失败')
+    }
+  } catch (error) {
+    console.error('更新License失败:', error)
+    // 显示后端返回的具体错误信息
+    const errorMessage = error.response?.data?.error || error.message || '更新License失败'
+    ElMessage.error(errorMessage)
+  }
+}
+
+// 搜索处理函数
+const handleSearch = () => {
+  currentPage.value = 1 // 搜索时重置到第一页
+  fetchLicenseList(currentPage.value, pageSize.value, searchKeyword.value)
+}
+
 // 每页条数变化处理
 const handleSizeChange = (size) => {
   pageSize.value = size
   currentPage.value = 1
-  fetchLicenseList(currentPage.value, pageSize.value)
+  fetchLicenseList(currentPage.value, pageSize.value, searchKeyword.value)
 }
 
 // 当前页变化处理
 const handleCurrentChange = (page) => {
   currentPage.value = page
-  fetchLicenseList(currentPage.value, pageSize.value)
+  fetchLicenseList(currentPage.value, pageSize.value, searchKeyword.value)
 }
 
 // 组件挂载时初始化
 onMounted(() => {
-  fetchLicenseList(currentPage.value, pageSize.value)
+  fetchLicenseList(currentPage.value, pageSize.value, searchKeyword.value)
   
   // 窗口大小变化时重新渲染图表
   window.addEventListener('resize', () => {
@@ -719,6 +824,9 @@ h1 {
   margin-bottom: 20px;
   border-bottom: 2px solid #f0f0f0;
   padding-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .table-header h3 {
@@ -726,6 +834,16 @@ h1 {
   color: #333;
   font-size: 1.2rem;
   font-weight: 600;
+}
+
+/* 搜索区域样式 */
+.search-container {
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  width: 300px;
 }
 
 .license-table:hover {
