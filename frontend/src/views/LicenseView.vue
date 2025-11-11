@@ -6,6 +6,7 @@
     
     <div class="license-actions">
       <el-button type="primary" @click="showAddDialog = true">新增License</el-button>
+      <el-button type="success" @click="generateFingerprint">测试生成指纹</el-button>
       <el-button @click="refreshData">刷新数据</el-button>
     </div>
 
@@ -126,6 +127,34 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- 指纹生成对话框 -->
+    <el-dialog v-model="showFingerprintDialog" title="机器指纹" width="500px">
+      <div class="fingerprint-content">
+        <div class="fingerprint-label">当前机器指纹：</div>
+        <div class="fingerprint-value">
+          <el-input v-model="currentFingerprint" readonly>
+            <template #append>
+              <el-button @click="copyFingerprint" type="primary">复制</el-button>
+            </template>
+          </el-input>
+        </div>
+        <div class="fingerprint-tip">
+          <el-alert
+            title="提示"
+            description="此指纹基于当前机器硬件信息生成，可用于License授权。请妥善保管此指纹。"
+            type="info"
+            show-icon
+            :closable="false"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showFingerprintDialog = false">关闭</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -138,6 +167,8 @@ import axios from 'axios'
 // 数据定义
 const licenseList = ref([])
 const showAddDialog = ref(false)
+const showFingerprintDialog = ref(false)
+const currentFingerprint = ref('')
 const chartInstance = ref(null)
 const total = ref(0)
 const currentPage = ref(1)
@@ -374,6 +405,51 @@ const deleteLicense = async (id) => {
 const refreshData = () => {
   fetchLicenseList(currentPage.value, pageSize.value)
   ElMessage.success('数据已刷新')
+}
+
+// 生成指纹
+const generateFingerprint = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/system/fingerprint`)
+    if (response.data && response.data.fingerprint) {
+      currentFingerprint.value = response.data.fingerprint
+      showFingerprintDialog.value = true
+    } else {
+      ElMessage.error('获取指纹失败')
+    }
+  } catch (error) {
+    console.error('获取指纹失败:', error)
+    ElMessage.error('获取指纹失败')
+  }
+}
+
+// 复制指纹
+const copyFingerprint = () => {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(currentFingerprint.value)
+      .then(() => {
+        ElMessage.success('指纹已复制到剪贴板')
+      })
+      .catch(err => {
+        console.error('复制失败:', err)
+        ElMessage.error('复制失败')
+      })
+  } else {
+    // 降级方案
+    const textArea = document.createElement('textarea')
+    textArea.value = currentFingerprint.value
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+    try {
+      document.execCommand('copy')
+      ElMessage.success('指纹已复制到剪贴板')
+    } catch (err) {
+      console.error('复制失败:', err)
+      ElMessage.error('复制失败')
+    }
+    document.body.removeChild(textArea)
+  }
 }
 
 
@@ -671,5 +747,24 @@ h1 {
 .validity-item :deep(.el-input-number .el-input__inner) {
   text-align: center;
   box-sizing: border-box;
+}
+
+/* 指纹对话框样式 */
+.fingerprint-content {
+  padding: 10px 0;
+}
+
+.fingerprint-label {
+  margin-bottom: 10px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.fingerprint-value {
+  margin-bottom: 15px;
+}
+
+.fingerprint-tip {
+  margin-top: 15px;
 }
 </style>
