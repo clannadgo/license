@@ -83,8 +83,8 @@
           <el-input v-model="newLicense.customer" placeholder="请输入客户名称" />
         </el-form-item>
         <el-form-item label="硬件指纹" required>
-          <el-input v-model="newLicense.fingerprint" placeholder="请输入硬件指纹" />
-          <div v-if="newLicense.fingerprint" class="fingerprint-format" :class="{ 'format-valid': validateFingerprintFormat(newLicense.fingerprint), 'format-invalid': !validateFingerprintFormat(newLicense.fingerprint) }">
+          <el-input v-model="newLicense.fingerprint" placeholder="请输入硬件指纹" @blur="showFingerprintValidation = true" />
+          <div v-if="newLicense.fingerprint && showFingerprintValidation" class="fingerprint-format" :class="{ 'format-valid': validateFingerprintFormat(newLicense.fingerprint), 'format-invalid': !validateFingerprintFormat(newLicense.fingerprint) }">
             <el-icon v-if="validateFingerprintFormat(newLicense.fingerprint)" style="color: #67C23A; margin-right: 5px;"><Check /></el-icon>
             <el-icon v-else style="color: #F56C6C; margin-right: 5px;"><Close /></el-icon>
             格式校验：{{ validateFingerprintFormat(newLicense.fingerprint) ? '正确' : '不正确' }}
@@ -130,7 +130,7 @@
       </el-form>
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="showAddDialog = false">取消</el-button>
+          <el-button @click="showAddDialog = false; showFingerprintValidation = false">取消</el-button>
           <el-button type="primary" @click="addLicense">确定</el-button>
         </span>
       </template>
@@ -182,6 +182,7 @@ const chartInstance = ref(null)
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(10)
+const showFingerprintValidation = ref(false)
 
 const newLicense = ref({
   customer: '',
@@ -315,7 +316,8 @@ const addLicense = async () => {
     
     // 验证指纹格式
     if (!validateFingerprintFormat(newLicense.value.fingerprint)) {
-      ElMessage.error('硬件指纹格式不正确，应为XXXX-XXXX-XXXX-XXXX格式（4组4位字母或数字）')
+      showFingerprintValidation.value = true // 确保显示格式校验提示
+      ElMessage.error('硬件指纹格式不正确，请按照下方提示的格式输入')
       return
     }
     
@@ -343,6 +345,7 @@ const addLicense = async () => {
     if (activateResponse.data.success) {
       ElMessage.success('License添加成功')
       showAddDialog.value = false
+      showFingerprintValidation.value = false // 重置指纹格式校验提示状态
       // 重置表单
       newLicense.value = {
         customer: '',
