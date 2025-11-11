@@ -6,7 +6,7 @@
     
     <div class="license-actions">
       <el-button type="primary" @click="showAddDialog = true">新增License</el-button>
-      <el-button type="success" @click="generateFingerprint">测试生成指纹</el-button>
+      <el-button type="success" @click="generateFingerprint">测试生成机器码</el-button>
       <el-button @click="refreshData">刷新数据</el-button>
     </div>
 
@@ -26,7 +26,7 @@
             <el-table :data="licenseList" style="width: 100%" table-layout="fixed">
               <el-table-column prop="id" label="ID" width="80" />
               <el-table-column prop="customer" label="客户名称" min-width="120" />
-              <el-table-column prop="fingerprint" label="硬件指纹" min-width="150" />
+              <el-table-column prop="fingerprint" label="机器码" min-width="150" />
               <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
               <el-table-column prop="activated_at" label="激活时间" min-width="150">
                 <template #default="scope">
@@ -82,7 +82,7 @@
         <el-form-item label="客户名称" required>
           <el-input v-model="newLicense.customer" placeholder="请输入客户名称" />
         </el-form-item>
-        <el-form-item label="硬件指纹" required>
+        <el-form-item label="机器码" required>
           <el-tooltip
             v-model="showFingerprintTooltip"
             :content="fingerprintTooltipContent"
@@ -91,7 +91,7 @@
           >
             <el-input 
               v-model="newLicense.fingerprint" 
-              placeholder="请输入硬件指纹" 
+              placeholder="请输入机器码" 
               @blur="handleFingerprintBlur"
               :class="{ 'fingerprint-invalid': showFingerprintValidation && newLicense.fingerprint && !validateFingerprintFormat(newLicense.fingerprint) }"
             />
@@ -144,9 +144,9 @@
     </el-dialog>
 
     <!-- 指纹生成对话框 -->
-    <el-dialog v-model="showFingerprintDialog" title="机器指纹" width="500px">
+    <el-dialog v-model="showFingerprintDialog" title="机器码" width="500px">
       <div class="fingerprint-content">
-        <div class="fingerprint-label">当前机器指纹：</div>
+        <div class="fingerprint-label">当前机器码：</div>
         <div class="fingerprint-value">
           <el-input v-model="currentFingerprint" readonly>
             <template #append>
@@ -320,7 +320,7 @@ const addLicense = async () => {
     
     // 验证硬件指纹必填
     if (!newLicense.value.fingerprint || newLicense.value.fingerprint.trim() === '') {
-      ElMessage.error('硬件指纹不能为空')
+      ElMessage.error('机器码不能为空')
       return
     }
     
@@ -328,8 +328,8 @@ const addLicense = async () => {
     if (!validateFingerprintFormat(newLicense.value.fingerprint)) {
       showFingerprintValidation.value = true // 确保显示格式校验提示
       showFingerprintTooltip.value = true // 显示tooltip
-      fingerprintTooltipContent.value = '硬件指纹格式不正确，应为XXXX-XXXX-XXXX-XXXX格式（4组4位字母或数字）'
-      ElMessage.error('硬件指纹格式不正确，请按照提示修改')
+      fingerprintTooltipContent.value = '机器码格式不正确，应为XXXX-XXXX-XXXX-XXXX格式（4组4位字母或数字）'
+      ElMessage.error('机器码格式不正确，请按照提示修改')
       return
     }
     
@@ -456,7 +456,7 @@ const handleFingerprintBlur = () => {
   if (newLicense.value.fingerprint) {
     if (!validateFingerprintFormat(newLicense.value.fingerprint)) {
       showFingerprintTooltip.value = true
-      fingerprintTooltipContent.value = '硬件指纹格式不正确，应为XXXX-XXXX-XXXX-XXXX格式（4组4位字母或数字）'
+      fingerprintTooltipContent.value = '机器码格式不正确，应为XXXX-XXXX-XXXX-XXXX格式（4组4位字母或数字）'
     } else {
       showFingerprintTooltip.value = false
     }

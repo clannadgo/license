@@ -55,9 +55,9 @@ func loadPrivateKey(path string) (*rsa.PrivateKey, error) {
 	return nil, fmt.Errorf("unsupported private key format")
 }
 
-// decodeActivationCodeToHex 支持把 "XXXX-XXXX-XXXX-XXXX" (base32) -> hex string
-// 当输入看起来像带 '-' 的激活码时调用
-func decodeActivationCodeToHex(code string) (string, error) {
+// decodeFingerprintToHex 支持把 "XXXX-XXXX-XXXX-XXXX" (base32) -> hex string
+// 当输入看起来像带 '-' 的机器码时调用
+func decodeFingerprintToHex(code string) (string, error) {
 	// remove dashes and spaces, uppercase
 	s := strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(code, "-", ""), " ", ""))
 	if len(s) != 16 {

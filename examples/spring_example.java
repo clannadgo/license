@@ -92,10 +92,10 @@ public class LicenseUtils {
         return claims;
     }
 
-    // 激活码 XXXX-XXXX-XXXX-XXXX -> hex
-    public static String decodeActivationCodeToHex(String code) {
+    // 机器码 XXXX-XXXX-XXXX-XXXX -> hex
+    public static String decodeFingerprintToHex(String code) {
         String s = code.replace("-", "").replace(" ", "").toUpperCase();
-        if (s.length() != 16) throw new IllegalArgumentException("invalid activation code length");
+        if (s.length() != 16) throw new IllegalArgumentException("invalid fingerprint length");
         Base32 b32 = new Base32();
         byte[] bytes = b32.decode(s);
         StringBuilder sb = new StringBuilder();
