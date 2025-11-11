@@ -1,43 +1,62 @@
 <template>
   <div class="license-container">
-    <h1>License管理系统</h1>
+    <div class="header">
+      <h1>License管理系统</h1>
+    </div>
     
     <div class="license-actions">
       <el-button type="primary" @click="showAddDialog = true">新增License</el-button>
       <el-button @click="refreshData">刷新数据</el-button>
     </div>
 
-    <!-- License统计图表 -->
-    <div class="license-chart">
-      <div id="licenseChart" style="width: 100%; height: 300px;"></div>
-    </div>
+    <div class="license-content">
+      <!-- License统计图表 -->
+      <div class="license-chart">
+        <div id="licenseChart"></div>
+      </div>
 
-    <!-- License列表 -->
-    <div class="license-table">
-      <el-table :data="licenseList" style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="customer" label="客户名称" width="150" />
-        <el-table-column prop="fingerprint" label="硬件指纹" width="180" />
-        <el-table-column prop="activated_at" label="激活时间" width="180" />
-        <el-table-column prop="expires_at" label="过期时间" width="180" />
-        <el-table-column prop="is_active" label="状态" width="100">
-          <template #default="scope">
-            <el-tag :type="scope.row.is_active ? 'success' : 'danger'">
-              {{ scope.row.is_active ? '激活' : '停用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="150">
-          <template #default="scope">
-            <el-button size="small" @click="deactivateLicense(scope.row.id)" v-if="scope.row.is_active">
-              停用
-            </el-button>
-            <el-button size="small" type="danger" @click="deleteLicense(scope.row.id)">
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <!-- License列表 -->
+      <div class="license-table">
+        <div class="table-header">
+          <h3>License列表</h3>
+        </div>
+        <el-table :data="licenseList" style="width: 100%">
+          <el-table-column prop="id" label="ID" width="80" />
+          <el-table-column prop="customer" label="客户名称" width="150" />
+          <el-table-column prop="fingerprint" label="硬件指纹" width="180" />
+          <el-table-column prop="activated_at" label="激活时间" width="180" />
+          <el-table-column prop="expires_at" label="过期时间" width="180" />
+          <el-table-column prop="is_active" label="状态" width="100">
+            <template #default="scope">
+              <el-tag :type="scope.row.is_active ? 'success' : 'danger'">
+                {{ scope.row.is_active ? '激活' : '停用' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="150">
+            <template #default="scope">
+              <el-button size="small" @click="deactivateLicense(scope.row.id)" v-if="scope.row.is_active">
+                停用
+              </el-button>
+              <el-button size="small" type="danger" @click="deleteLicense(scope.row.id)">
+                删除
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <!-- 分页组件 -->
+        <div class="pagination-container">
+          <el-pagination
+            v-model:current-page="currentPage"
+            v-model:page-size="pageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            layout="total, sizes, prev, pager, next, jumper"
+            :total="total"
+            @size-change="handlePageChange"
+            @current-change="handlePageChange"
+          />
+        </div>
+      </div>
     </div>
 
     <!-- 新增License对话框 -->
@@ -76,6 +95,9 @@ import axios from 'axios'
 const licenseList = ref([])
 const showAddDialog = ref(false)
 const chartInstance = ref(null)
+const total = ref(0)
+const currentPage = ref(1)
+const pageSize = ref(10)
 
 const newLicense = ref({
   customer: '',
@@ -141,11 +163,31 @@ const updateChart = () => {
 }
 
 // 获取License列表
-const fetchLicenseList = async () => {
+const fetchLicenseList = async (page = 1, size = 10) => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/license/activations`)
-    // 后端返回格式是 {"activations": [...] }
-    licenseList.value = response.data.activations || []
+    const response = await axios.get(`${API_BASE_URL}/license/activations`, {
+      params: {
+        page,
+        size
+      }
+    })
+    
+    // 处理后端返回的数据
+    // 假设后端可能支持分页或不分页的两种情况
+    if (response.data.activations) {
+      licenseList.value = response.data.activations || []
+      // 如果后端支持分页，会返回总数
+      if (response.data.total !== undefined) {
+        total.value = response.data.total
+      } else {
+        total.value = licenseList.value.length
+      }
+    } else {
+      // 兼容不分页的情况
+      licenseList.value = response.data || []
+      total.value = licenseList.value.length
+    }
+    
     updateChart()
   } catch (error) {
     console.error('获取License列表失败:', error)
@@ -218,13 +260,20 @@ const deleteLicense = async (id) => {
 
 // 刷新数据
 const refreshData = () => {
-  fetchLicenseList()
+  fetchLicenseList(currentPage.value, pageSize.value)
   ElMessage.success('数据已刷新')
+}
+
+// 分页变化处理
+const handlePageChange = (page, size) => {
+  currentPage.value = page
+  pageSize.value = size
+  fetchLicenseList(page, size)
 }
 
 // 组件挂载时初始化
 onMounted(() => {
-  fetchLicenseList()
+  fetchLicenseList(currentPage.value, pageSize.value)
   initChart()
   
   // 窗口大小变化时重新渲染图表
@@ -239,34 +288,127 @@ onMounted(() => {
 <style scoped>
 .license-container {
   padding: 20px;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
+  min-height: 100vh;
+  background-color: #f5f7fa;
+}
+
+.header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 30px 0;
+  text-align: center;
+  border-radius: 8px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+  margin: 0;
+  font-size: 2.2rem;
+  font-weight: 600;
+  letter-spacing: -0.5px;
 }
 
 .license-actions {
   margin-bottom: 20px;
   display: flex;
-  gap: 10px;
+  gap: 15px;
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.license-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .license-chart {
-  margin-bottom: 30px;
-  background: #fff;
-  border-radius: 4px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  padding: 24px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.license-chart:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
 }
 
 .license-table {
-  background: #fff;
-  border-radius: 4px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  padding: 24px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  flex: 1;
 }
 
-h1 {
-  color: #333;
+.table-header {
   margin-bottom: 20px;
-  text-align: center;
+  border-bottom: 2px solid #f0f0f0;
+  padding-bottom: 10px;
+}
+
+.table-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.license-table:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+}
+
+#licenseChart {
+  width: 100%;
+  height: 250px; /* 减小图表高度 */
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .license-container {
+    padding: 15px;
+  }
+  
+  .header {
+    padding: 20px 0;
+  }
+  
+  h1 {
+    font-size: 1.8rem;
+  }
+  
+  .license-actions {
+    flex-direction: column;
+    gap: 10px;
+    padding: 15px;
+  }
+  
+  .license-chart,
+  .license-table {
+    padding: 15px;
+  }
+  
+  #licenseChart {
+    height: 200px;
+  }
+  
+  .pagination-container {
+    justify-content: center;
+  }
 }
 </style>

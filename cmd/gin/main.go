@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"license/internal/database"
@@ -69,15 +70,36 @@ func main() {
 		// 许可证激活端点
 		api.POST("/license/activate", license.ActivateHandler(pubKeyPath, storePath, db))
 
-		// 获取所有许可证激活记录
+		// 获取所有许可证激活记录（支持分页）
 		api.GET("/license/activations", func(c *gin.Context) {
-			activations, err := db.GetAllLicenseActivations()
+			// 获取分页参数
+			page := 1
+			pageSize := 10
+
+			if pageStr := c.Query("page"); pageStr != "" {
+				if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+					page = p
+				}
+			}
+
+			if sizeStr := c.Query("size"); sizeStr != "" {
+				if s, err := strconv.Atoi(sizeStr); err == nil && s > 0 && s <= 100 {
+					pageSize = s
+				}
+			}
+
+			// 使用分页查询
+			activations, total, err := db.GetLicenseActivationsWithPagination(page, pageSize)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get activations"})
 				return
 			}
+
 			c.JSON(http.StatusOK, gin.H{
 				"activations": activations,
+				"total":       total,
+				"page":        page,
+				"pageSize":    pageSize,
 			})
 		})
 

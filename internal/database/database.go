@@ -11,14 +11,14 @@ import (
 
 // LicenseActivation 记录许可证激活信息
 type LicenseActivation struct {
-	ID           int       `json:"id"`
-	Customer     string    `json:"customer"`
-	Fingerprint  string    `json:"fingerprint"`
-	License      string    `json:"license"`
-	IssuedAt     time.Time `json:"issued_at"`
-	ExpiresAt    time.Time `json:"expires_at"`
-	ActivatedAt  time.Time `json:"activated_at"`
-	IsActive     bool      `json:"is_active"`
+	ID          int       `json:"id"`
+	Customer    string    `json:"customer"`
+	Fingerprint string    `json:"fingerprint"`
+	License     string    `json:"license"`
+	IssuedAt    time.Time `json:"issued_at"`
+	ExpiresAt   time.Time `json:"expires_at"`
+	ActivatedAt time.Time `json:"activated_at"`
+	IsActive    bool      `json:"is_active"`
 }
 
 // DB 数据库连接
@@ -149,7 +149,75 @@ func (db *DB) GetLicenseActivationByFingerprint(fingerprint string) (*LicenseAct
 	return &activation, nil
 }
 
-// GetAllLicenseActivations 获取所有许可证激活记录
+// GetLicenseActivationsWithPagination 分页获取许可证激活记录
+func (db *DB) GetLicenseActivationsWithPagination(page, pageSize int) ([]LicenseActivation, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 10
+	}
+
+	offset := (page - 1) * pageSize
+
+	// 查询总数
+	var total int64
+	totalQuery := `SELECT COUNT(*) FROM license_activations`
+	err := db.conn.QueryRow(totalQuery).Scan(&total)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count license activations: %v", err)
+	}
+
+	// 分页查询
+	query := `
+	SELECT id, customer, fingerprint, license, issued_at, expires_at, activated_at, is_active
+	FROM license_activations
+	ORDER BY activated_at DESC
+	LIMIT ? OFFSET ?
+	`
+
+	rows, err := db.conn.Query(query, pageSize, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to query license activations with pagination: %v", err)
+	}
+	defer rows.Close()
+
+	var activations []LicenseActivation
+
+	for rows.Next() {
+		var activation LicenseActivation
+		var issuedAt, expiresAt, activatedAt int64
+
+		err := rows.Scan(
+			&activation.ID,
+			&activation.Customer,
+			&activation.Fingerprint,
+			&activation.License,
+			&issuedAt,
+			&expiresAt,
+			&activatedAt,
+			&activation.IsActive,
+		)
+
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to scan license activation: %v", err)
+		}
+
+		activation.IssuedAt = time.Unix(issuedAt, 0)
+		activation.ExpiresAt = time.Unix(expiresAt, 0)
+		activation.ActivatedAt = time.Unix(activatedAt, 0)
+
+		activations = append(activations, activation)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("error iterating license activations: %v", err)
+	}
+
+	return activations, total, nil
+}
+
+// GetAllLicenseActivations 获取所有许可证激活记录（兼容旧版）
 func (db *DB) GetAllLicenseActivations() ([]LicenseActivation, error) {
 	query := `
 	SELECT id, customer, fingerprint, license, issued_at, expires_at, activated_at, is_active
