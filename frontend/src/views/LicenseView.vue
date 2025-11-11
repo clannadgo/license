@@ -353,11 +353,6 @@ const addLicense = async () => {
       validitySeconds: newLicense.value.validitySeconds
     }
     
-    // 只有当licenseContent不为空时才添加到请求中
-    if (newLicense.value.licenseContent) {
-      requestData.license = newLicense.value.licenseContent
-    }
-    
     const activateResponse = await axios.post(`${API_BASE_URL}/license/activate`, requestData)
     
     if (activateResponse.data.success) {

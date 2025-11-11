@@ -15,10 +15,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/square/go-jose/v3"
 	"license/internal/database"
 	"license/internal/hwid"
+
+	"github.com/gin-gonic/gin"
+	"github.com/square/go-jose/v3"
 )
 
 // ------------------ 公钥加载 ------------------
@@ -159,7 +160,6 @@ func ActivateHandler(pubKeyPath, storePath string, db *database.DB) gin.HandlerF
 	}
 	return func(c *gin.Context) {
 		var req struct {
-			License         string `json:"license"`
 			Customer        string `json:"customer"`
 			Fingerprint     string `json:"fingerprint"`
 			Description     string `json:"description"`
@@ -167,8 +167,9 @@ func ActivateHandler(pubKeyPath, storePath string, db *database.DB) gin.HandlerF
 			ValidityHours   int    `json:"validityHours"`
 			ValidityMinutes int    `json:"validityMinutes"`
 			ValiditySeconds int    `json:"validitySeconds"`
+			License         string // 用于内部存储生成的license，不从前端接收
 		}
-		if err := c.BindJSON(&req); err != nil || req.License == "" {
+		if err := c.BindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 			return
 		}
@@ -181,45 +182,42 @@ func ActivateHandler(pubKeyPath, storePath string, db *database.DB) gin.HandlerF
 			return
 		}
 
-		// 如果提供了客户名称和指纹，则生成新的license
-		if req.Customer != "" && req.Fingerprint != "" {
-			// 验证至少有一个时间单位被设置
-			if req.ValidityDays == 0 && req.ValidityHours == 0 && 
-			   req.ValidityMinutes == 0 && req.ValiditySeconds == 0 {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "at least one time unit must be set"})
-				return
-			}
-			
-			// 将指纹转换为hex格式
-			fp := req.Fingerprint
-			if strings.Contains(req.Fingerprint, "-") {
-				h, err := DecodeActivationCodeToHex(req.Fingerprint)
-				if err != nil {
-					c.JSON(http.StatusBadRequest, gin.H{"error": "failed to decode fingerprint: " + err.Error()})
-					return
-				}
-				fp = h
-			}
-			
-			// 计算过期时间
-			now := time.Now().UTC()
-			exp := now.Add(
-				time.Duration(req.ValidityDays) * 24 * time.Hour +
-				time.Duration(req.ValidityHours) * time.Hour +
-				time.Duration(req.ValidityMinutes) * time.Minute +
-				time.Duration(req.ValiditySeconds) * time.Second,
-			).Unix()
-			
-			// 生成新的license
-			newLicense, err := generateLicense(pubKeyPath, req.Customer, fp, now, exp)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate license: " + err.Error()})
-				return
-			}
-			
-			// 使用新生成的license
-			req.License = newLicense
+		// 验证至少有一个时间单位被设置
+		if req.ValidityDays == 0 && req.ValidityHours == 0 &&
+			req.ValidityMinutes == 0 && req.ValiditySeconds == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "at least one time unit must be set"})
+			return
 		}
+
+		// 将指纹转换为hex格式
+		fp := req.Fingerprint
+		if strings.Contains(req.Fingerprint, "-") {
+			h, err := DecodeActivationCodeToHex(req.Fingerprint)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "failed to decode fingerprint: " + err.Error()})
+				return
+			}
+			fp = h
+		}
+
+		// 计算过期时间
+		now := time.Now().UTC()
+		exp := now.Add(
+			time.Duration(req.ValidityDays)*24*time.Hour +
+				time.Duration(req.ValidityHours)*time.Hour +
+				time.Duration(req.ValidityMinutes)*time.Minute +
+				time.Duration(req.ValiditySeconds)*time.Second,
+		).Unix()
+
+		// 生成新的license
+		newLicense, err := generateLicense(pubKeyPath, req.Customer, fp, now, exp)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate license: " + err.Error()})
+			return
+		}
+
+		// 使用新生成的license
+		req.License = newLicense
 
 		cl, err := verifyJWS(pub, req.License)
 		if err != nil {
