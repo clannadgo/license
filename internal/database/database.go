@@ -15,6 +15,7 @@ type LicenseActivation struct {
 	Customer    string    `json:"customer"`
 	Fingerprint string    `json:"fingerprint"`
 	License     string    `json:"license"`
+	Description string    `json:"description"`
 	IssuedAt    time.Time `json:"issued_at"`
 	ExpiresAt   time.Time `json:"expires_at"`
 	ActivatedAt time.Time `json:"activated_at"`
@@ -40,6 +41,11 @@ func NewDB(dbPath string) (*DB, error) {
 		return nil, fmt.Errorf("failed to create tables: %v", err)
 	}
 
+	// 运行数据库迁移
+	if err := db.runMigrations(); err != nil {
+		return nil, fmt.Errorf("failed to run migrations: %v", err)
+	}
+
 	return db, nil
 }
 
@@ -56,6 +62,7 @@ func (db *DB) createTables() error {
 		customer TEXT NOT NULL,
 		fingerprint TEXT NOT NULL,
 		license TEXT NOT NULL,
+		description TEXT DEFAULT '',
 		issued_at INTEGER NOT NULL,
 		expires_at INTEGER NOT NULL,
 		activated_at INTEGER NOT NULL,
@@ -85,12 +92,75 @@ func (db *DB) createTables() error {
 	return nil
 }
 
+// runMigrations 运行数据库迁移
+func (db *DB) runMigrations() error {
+	// 创建迁移表
+	migrationTableQuery := `
+	CREATE TABLE IF NOT EXISTS schema_migrations (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		version TEXT NOT NULL UNIQUE,
+		applied_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+	);
+	`
+
+	_, err := db.conn.Exec(migrationTableQuery)
+	if err != nil {
+		return fmt.Errorf("failed to create migration table: %v", err)
+	}
+
+	// 检查是否需要添加description字段
+	var hasDescriptionColumn bool
+	checkColumnQuery := `PRAGMA table_info(license_activations);`
+	rows, err := db.conn.Query(checkColumnQuery)
+	if err != nil {
+		return fmt.Errorf("failed to check table columns: %v", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name, dataType string
+		var notNull, pk int
+		var defaultValue interface{}
+
+		err := rows.Scan(&cid, &name, &dataType, &notNull, &defaultValue, &pk)
+		if err != nil {
+			return fmt.Errorf("failed to scan column info: %v", err)
+		}
+
+		if name == "description" {
+			hasDescriptionColumn = true
+			break
+		}
+	}
+
+	// 如果没有description字段，则添加
+	if !hasDescriptionColumn {
+		migrationQuery := `ALTER TABLE license_activations ADD COLUMN description TEXT DEFAULT '';`
+		_, err := db.conn.Exec(migrationQuery)
+		if err != nil {
+			return fmt.Errorf("failed to add description column: %v", err)
+		}
+
+		// 记录迁移
+		insertMigrationQuery := `INSERT INTO schema_migrations (version) VALUES ('add_description_column');`
+		_, err = db.conn.Exec(insertMigrationQuery)
+		if err != nil {
+			return fmt.Errorf("failed to record migration: %v", err)
+		}
+
+		log.Println("Database migration completed: Added description column to license_activations table")
+	}
+
+	return nil
+}
+
 // InsertLicenseActivation 插入许可证激活记录
 func (db *DB) InsertLicenseActivation(activation *LicenseActivation) error {
 	query := `
 	INSERT INTO license_activations 
-	(customer, fingerprint, license, issued_at, expires_at, activated_at, is_active)
-	VALUES (?, ?, ?, ?, ?, ?, ?)
+	(customer, fingerprint, license, description, issued_at, expires_at, activated_at, is_active)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := db.conn.Exec(
@@ -98,6 +168,7 @@ func (db *DB) InsertLicenseActivation(activation *LicenseActivation) error {
 		activation.Customer,
 		activation.Fingerprint,
 		activation.License,
+		activation.Description,
 		activation.IssuedAt.Unix(),
 		activation.ExpiresAt.Unix(),
 		activation.ActivatedAt.Unix(),
@@ -114,7 +185,7 @@ func (db *DB) InsertLicenseActivation(activation *LicenseActivation) error {
 // GetLicenseActivationByFingerprint 根据指纹获取许可证激活记录
 func (db *DB) GetLicenseActivationByFingerprint(fingerprint string) (*LicenseActivation, error) {
 	query := `
-	SELECT id, customer, fingerprint, license, issued_at, expires_at, activated_at, is_active
+	SELECT id, customer, fingerprint, license, description, issued_at, expires_at, activated_at, is_active
 	FROM license_activations
 	WHERE fingerprint = ? AND is_active = 1
 	ORDER BY activated_at DESC
@@ -129,6 +200,7 @@ func (db *DB) GetLicenseActivationByFingerprint(fingerprint string) (*LicenseAct
 		&activation.Customer,
 		&activation.Fingerprint,
 		&activation.License,
+		&activation.Description,
 		&issuedAt,
 		&expiresAt,
 		&activatedAt,
@@ -170,7 +242,7 @@ func (db *DB) GetLicenseActivationsWithPagination(page, pageSize int) ([]License
 
 	// 分页查询
 	query := `
-	SELECT id, customer, fingerprint, license, issued_at, expires_at, activated_at, is_active
+	SELECT id, customer, fingerprint, license, description, issued_at, expires_at, activated_at, is_active
 	FROM license_activations
 	ORDER BY activated_at DESC
 	LIMIT ? OFFSET ?
@@ -193,6 +265,7 @@ func (db *DB) GetLicenseActivationsWithPagination(page, pageSize int) ([]License
 			&activation.Customer,
 			&activation.Fingerprint,
 			&activation.License,
+			&activation.Description,
 			&issuedAt,
 			&expiresAt,
 			&activatedAt,
@@ -220,7 +293,7 @@ func (db *DB) GetLicenseActivationsWithPagination(page, pageSize int) ([]License
 // GetAllLicenseActivations 获取所有许可证激活记录（兼容旧版）
 func (db *DB) GetAllLicenseActivations() ([]LicenseActivation, error) {
 	query := `
-	SELECT id, customer, fingerprint, license, issued_at, expires_at, activated_at, is_active
+	SELECT id, customer, fingerprint, license, description, issued_at, expires_at, activated_at, is_active
 	FROM license_activations
 	ORDER BY activated_at DESC
 	`
@@ -242,6 +315,7 @@ func (db *DB) GetAllLicenseActivations() ([]LicenseActivation, error) {
 			&activation.Customer,
 			&activation.Fingerprint,
 			&activation.License,
+			&activation.Description,
 			&issuedAt,
 			&expiresAt,
 			&activatedAt,
@@ -281,7 +355,7 @@ func (db *DB) DeactivateLicense(id int) error {
 // GetExpiredLicenses 获取已过期的许可证
 func (db *DB) GetExpiredLicenses() ([]LicenseActivation, error) {
 	query := `
-	SELECT id, customer, fingerprint, license, issued_at, expires_at, activated_at, is_active
+	SELECT id, customer, fingerprint, license, description, issued_at, expires_at, activated_at, is_active
 	FROM license_activations
 	WHERE expires_at < ? AND is_active = 1
 	`
@@ -303,6 +377,7 @@ func (db *DB) GetExpiredLicenses() ([]LicenseActivation, error) {
 			&activation.Customer,
 			&activation.Fingerprint,
 			&activation.License,
+			&activation.Description,
 			&issuedAt,
 			&expiresAt,
 			&activatedAt,

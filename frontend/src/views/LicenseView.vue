@@ -26,6 +26,7 @@
               <el-table-column prop="id" label="ID" width="80" />
               <el-table-column prop="customer" label="客户名称" min-width="120" />
               <el-table-column prop="fingerprint" label="硬件指纹" min-width="150" />
+              <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
               <el-table-column prop="activated_at" label="激活时间" min-width="150">
                 <template #default="scope">
                   {{ formatDate(scope.row.activated_at) }}
@@ -75,19 +76,47 @@
     </div>
 
     <!-- 新增License对话框 -->
-    <el-dialog v-model="showAddDialog" title="新增License" width="500px">
-      <el-form :model="newLicense" label-width="120px">
-        <el-form-item label="客户名称">
+    <el-dialog v-model="showAddDialog" title="新增License" width="600px">
+      <el-form :model="newLicense" label-width="80px">
+        <el-form-item label="客户名称" required>
           <el-input v-model="newLicense.customer" placeholder="请输入客户名称" />
         </el-form-item>
-        <el-form-item label="硬件指纹">
+        <el-form-item label="硬件指纹" required>
           <el-input v-model="newLicense.fingerprint" placeholder="请输入硬件指纹" />
         </el-form-item>
-        <el-form-item label="有效期(天)">
-          <el-input-number v-model="newLicense.validityDays" :min="1" :max="3650" />
+        <el-form-item label="有效期">
+          <div class="validity-container">
+            <div class="validity-row">
+              <div class="validity-item">
+                <el-form-item label="天数" prop="validityDays">
+                  <el-input-number v-model="newLicense.validityDays" :min="0" :max="3650" style="width: 100%" />
+                </el-form-item>
+              </div>
+              <div class="validity-item">
+                <el-form-item label="小时" prop="validityHours">
+                  <el-input-number v-model="newLicense.validityHours" :min="0" :max="23" style="width: 100%" />
+                </el-form-item>
+              </div>
+            </div>
+            <div class="validity-row">
+              <div class="validity-item">
+                <el-form-item label="分钟" prop="validityMinutes">
+                  <el-input-number v-model="newLicense.validityMinutes" :min="0" :max="59" style="width: 100%" />
+                </el-form-item>
+              </div>
+              <div class="validity-item">
+                <el-form-item label="秒" prop="validitySeconds">
+                  <el-input-number v-model="newLicense.validitySeconds" :min="0" :max="59" style="width: 100%" />
+                </el-form-item>
+              </div>
+            </div>
+          </div>
+          <div style="color: #909399; font-size: 12px; margin-top: 5px;">
+            至少需要设置一个时间单位
+          </div>
         </el-form-item>
-        <el-form-item label="License内容">
-          <el-input v-model="newLicense.licenseContent" type="textarea" rows="4" placeholder="请输入License内容" />
+        <el-form-item label="描述">
+          <el-input v-model="newLicense.description" type="textarea" rows="4" placeholder="请输入描述内容" maxlength="300" show-word-limit />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -117,8 +146,11 @@ const pageSize = ref(10)
 const newLicense = ref({
   customer: '',
   fingerprint: '',
-  validityDays: 365,
-  licenseContent: ''
+  validityDays: 0,
+  validityHours: 0,
+  validityMinutes: 0,
+  validitySeconds: 0,
+  description: ''
 })
 
 // 日期格式化函数
@@ -229,9 +261,37 @@ const fetchLicenseList = async (page = 1, size = 10) => {
 // 添加License
 const addLicense = async () => {
   try {
+    // 验证客户名称必填
+    if (!newLicense.value.customer || newLicense.value.customer.trim() === '') {
+      ElMessage.error('客户名称不能为空')
+      return
+    }
+    
+    // 验证硬件指纹必填
+    if (!newLicense.value.fingerprint || newLicense.value.fingerprint.trim() === '') {
+      ElMessage.error('硬件指纹不能为空')
+      return
+    }
+    
+    // 验证至少有一个时间单位被设置
+    if (newLicense.value.validityDays === 0 && 
+        newLicense.value.validityHours === 0 && 
+        newLicense.value.validityMinutes === 0 && 
+        newLicense.value.validitySeconds === 0) {
+      ElMessage.error('请至少设置一个时间单位')
+      return
+    }
+    
     // 首先激活License
     const activateResponse = await axios.post(`${API_BASE_URL}/license/activate`, {
-      license: newLicense.value.licenseContent
+      license: newLicense.value.licenseContent,
+      customer: newLicense.value.customer,
+      fingerprint: newLicense.value.fingerprint,
+      description: newLicense.value.description,
+      validityDays: newLicense.value.validityDays,
+      validityHours: newLicense.value.validityHours,
+      validityMinutes: newLicense.value.validityMinutes,
+      validitySeconds: newLicense.value.validitySeconds
     })
     
     if (activateResponse.data.success) {
@@ -241,8 +301,11 @@ const addLicense = async () => {
       newLicense.value = {
         customer: '',
         fingerprint: '',
-        validityDays: 365,
-        licenseContent: ''
+        validityDays: 0,
+        validityHours: 0,
+        validityMinutes: 0,
+        validitySeconds: 0,
+        description: ''
       }
       // 刷新列表
       fetchLicenseList()
@@ -524,5 +587,71 @@ h1 {
   .pagination-container {
     justify-content: center;
   }
+}
+
+/* 有效期输入区域样式 */
+.validity-container {
+  width: 100%;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  padding: 12px;
+  background-color: #f9f9f9;
+  box-sizing: border-box; /* 确保padding不会增加总宽度 */
+  overflow: hidden; /* 防止内容溢出 */
+}
+
+.validity-row {
+  margin-bottom: 10px;
+  display: flex;
+  gap: 10px; /* 使用gap代替el-col的gutter */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.validity-row:last-child {
+  margin-bottom: 0;
+}
+
+.validity-item {
+  margin-bottom: 0;
+  flex: 1; /* 让每个输入框占据相等的空间 */
+  min-width: 0; /* 允许缩小 */
+  box-sizing: border-box;
+  overflow: hidden; /* 防止内容溢出 */
+}
+
+.validity-item :deep(.el-form-item) {
+  margin-bottom: 0;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.validity-item :deep(.el-form-item__label) {
+  font-weight: 500;
+  color: #606266;
+  line-height: 1.2;
+  padding-bottom: 4px;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  flex-shrink: 0;
+}
+
+.validity-item :deep(.el-form-item__content) {
+  width: 100%;
+  box-sizing: border-box;
+  flex: 1;
+}
+
+.validity-item :deep(.el-input-number) {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.validity-item :deep(.el-input-number .el-input__inner) {
+  text-align: center;
+  box-sizing: border-box;
 }
 </style>

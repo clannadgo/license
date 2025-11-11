@@ -96,6 +96,60 @@ func DecodeActivationCodeToHex(code string) (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+// ------------------ License Generation ------------------
+
+func generateLicense(pubKeyPath, customer, fingerprint string, issuedAt time.Time, exp int64) (string, error) {
+	// Load private key (assuming it's in the same directory as public key with .key extension)
+	privKeyPath := strings.TrimSuffix(pubKeyPath, ".pub") + ".key"
+	b, err := ioutil.ReadFile(privKeyPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read private key: %v", err)
+	}
+	block, _ := pem.Decode(b)
+	if block == nil {
+		return "", errors.New("invalid private key pem")
+	}
+	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse private key: %v", err)
+	}
+
+	// Create signing key
+	signingKey := jose.SigningKey{
+		Algorithm: jose.RS256,
+		Key:       privKey,
+	}
+
+	// Create signer
+	signer, err := jose.NewSigner(signingKey, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create signer: %v", err)
+	}
+
+	// Create claims
+	c := claims{
+		Iss:         "license-service",
+		Sub:         customer,
+		Customer:    customer,
+		Fingerprint: fingerprint,
+		Iat:         issuedAt.Unix(),
+		Exp:         exp,
+	}
+
+	// Sign claims
+	payload, err := json.Marshal(c)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal claims: %v", err)
+	}
+
+	jws, err := signer.Sign(payload)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign claims: %v", err)
+	}
+
+	return jws.CompactSerialize()
+}
+
 // ------------------ Activate Handler ------------------
 
 func ActivateHandler(pubKeyPath, storePath string, db *database.DB) gin.HandlerFunc {
@@ -105,7 +159,14 @@ func ActivateHandler(pubKeyPath, storePath string, db *database.DB) gin.HandlerF
 	}
 	return func(c *gin.Context) {
 		var req struct {
-			License string `json:"license"`
+			License         string `json:"license"`
+			Customer        string `json:"customer"`
+			Fingerprint     string `json:"fingerprint"`
+			Description     string `json:"description"`
+			ValidityDays    int    `json:"validityDays"`
+			ValidityHours   int    `json:"validityHours"`
+			ValidityMinutes int    `json:"validityMinutes"`
+			ValiditySeconds int    `json:"validitySeconds"`
 		}
 		if err := c.BindJSON(&req); err != nil || req.License == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
@@ -118,6 +179,46 @@ func ActivateHandler(pubKeyPath, storePath string, db *database.DB) gin.HandlerF
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to decode local fingerprint"})
 			return
+		}
+
+		// 如果提供了客户名称和指纹，则生成新的license
+		if req.Customer != "" && req.Fingerprint != "" {
+			// 验证至少有一个时间单位被设置
+			if req.ValidityDays == 0 && req.ValidityHours == 0 && 
+			   req.ValidityMinutes == 0 && req.ValiditySeconds == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "at least one time unit must be set"})
+				return
+			}
+			
+			// 将指纹转换为hex格式
+			fp := req.Fingerprint
+			if strings.Contains(req.Fingerprint, "-") {
+				h, err := DecodeActivationCodeToHex(req.Fingerprint)
+				if err != nil {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "failed to decode fingerprint: " + err.Error()})
+					return
+				}
+				fp = h
+			}
+			
+			// 计算过期时间
+			now := time.Now().UTC()
+			exp := now.Add(
+				time.Duration(req.ValidityDays) * 24 * time.Hour +
+				time.Duration(req.ValidityHours) * time.Hour +
+				time.Duration(req.ValidityMinutes) * time.Minute +
+				time.Duration(req.ValiditySeconds) * time.Second,
+			).Unix()
+			
+			// 生成新的license
+			newLicense, err := generateLicense(pubKeyPath, req.Customer, fp, now, exp)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate license: " + err.Error()})
+				return
+			}
+			
+			// 使用新生成的license
+			req.License = newLicense
 		}
 
 		cl, err := verifyJWS(pub, req.License)
@@ -161,6 +262,7 @@ func ActivateHandler(pubKeyPath, storePath string, db *database.DB) gin.HandlerF
 				Customer:    cl.Customer,
 				Fingerprint: localHex,
 				License:     req.License,
+				Description: req.Description,
 				IssuedAt:    time.Unix(cl.Iat, 0),
 				ExpiresAt:   time.Unix(cl.Exp, 0),
 				ActivatedAt: time.Now(),
@@ -174,7 +276,7 @@ func ActivateHandler(pubKeyPath, storePath string, db *database.DB) gin.HandlerF
 			}
 		}
 
-		c.JSON(http.StatusOK, gin.H{"ok": true, "customer": cl.Customer, "exp": cl.Exp})
+		c.JSON(http.StatusOK, gin.H{"success": true, "customer": cl.Customer, "exp": cl.Exp})
 	}
 }
 
