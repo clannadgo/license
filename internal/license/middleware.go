@@ -249,13 +249,10 @@ func ActivateHandler(pubKeyPath, privateKeyPath string, db *database.DB) gin.Han
 				return
 			}
 
-			// 如果已有激活记录，将其标记为非活动状态
-			if existingActivation != nil {
-				err = db.DeactivateLicense(existingActivation.ID)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
-					return
-				}
+			// 如果已有激活记录且仍处于活动状态，返回错误提示指纹已存在
+			if existingActivation != nil && existingActivation.IsActive {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "fingerprint already exists and is active"})
+				return
 			}
 
 			// 创建新的激活记录
