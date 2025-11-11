@@ -1,8 +1,13 @@
 @echo off
 echo Building license shared libraries for multiple platforms...
 
-REM 创建输出目录
+REM Create output directory
 if not exist "output" mkdir output
+
+REM Organize dependencies first
+echo.
+echo Organizing dependencies...
+go mod tidy
 
 REM Windows AMD64
 echo.
@@ -82,12 +87,12 @@ if %errorlevel% neq 0 (
     echo Success: license_darwin_arm64.dylib
 )
 
-REM 创建通用库文件（符号链接或复制）
+REM Create generic library files
 echo.
 echo Creating generic library files...
 
-REM 复制当前平台的库为通用库文件
-copy output\license_windows_amd64.dll license.dll > nul 2>&1
+REM Copy current platform library as generic library file to output directory
+copy output\license_windows_amd64.dll output\license.dll > nul 2>&1
 if %errorlevel% equ 0 (
     echo Created: license.dll (Windows AMD64)
 )

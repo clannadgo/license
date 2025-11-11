@@ -2,7 +2,6 @@ package main
 
 /*
 #cgo CFLAGS: -Werror
-#cgo windows LDFLAGS: -Wl,--out-implib,license.dll.a -Wl,--export-all-symbols
 #cgo linux LDFLAGS: -shared -fPIC
 #cgo darwin LDFLAGS: -shared -fPIC
 #include <stdlib.h>
@@ -10,8 +9,8 @@ package main
 
 // 导出函数声明
 extern char* GenerateFingerprint();
-extern int VerifyLicense(const char* publicKeyPath, const char* licenseContent);
-extern char* GetLicenseData(const char* publicKeyPath, const char* licenseContent);
+extern int VerifyLicense(char* publicKeyPath, char* licenseContent);
+extern char* GetLicenseData(char* publicKeyPath, char* licenseContent);
 extern void FreeString(char* str);
 */
 import "C"
@@ -29,6 +28,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 	"time"

@@ -5,6 +5,11 @@ echo "Building license shared libraries for multiple platforms..."
 # 创建输出目录
 mkdir -p output
 
+# 首先整理依赖
+echo ""
+echo "Organizing dependencies..."
+go mod tidy
+
 # Windows AMD64
 echo ""
 echo "Building for Windows AMD64..."
@@ -101,17 +106,17 @@ case $CURRENT_ARCH in
         ;;
 esac
 
-# 复制当前平台的库为通用库文件
+# 复制当前平台的库为通用库文件到output目录
 case $CURRENT_OS in
     linux)
         if [ -f "output/license_linux_${CURRENT_ARCH}.so" ]; then
-            cp "output/license_linux_${CURRENT_ARCH}.so" "license.so"
+            cp "output/license_linux_${CURRENT_ARCH}.so" "output/license.so"
             echo "Created: license.so (Linux ${CURRENT_ARCH})"
         fi
         ;;
     darwin)
         if [ -f "output/license_darwin_${CURRENT_ARCH}.dylib" ]; then
-            cp "output/license_darwin_${CURRENT_ARCH}.dylib" "license.dylib"
+            cp "output/license_darwin_${CURRENT_ARCH}.dylib" "output/license.dylib"
             echo "Created: license.dylib (macOS ${CURRENT_ARCH})"
         fi
         ;;

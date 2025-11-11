@@ -53,6 +53,10 @@ echo "Building license shared library for $OS/$ARCH..."
 # 创建输出目录
 mkdir -p output
 
+# 首先整理依赖
+echo "Organizing dependencies..."
+go mod tidy
+
 # 设置环境变量
 export GOOS=$OS
 export GOARCH=$ARCH
@@ -81,15 +85,15 @@ if [ $? -eq 0 ]; then
     if [ "$OS" = "$CURRENT_OS" ] && [ "$ARCH" = "$CURRENT_ARCH" ]; then
         case $OS in
             windows)
-                cp output/$OUTPUT_FILE license.dll
+                cp output/$OUTPUT_FILE output/license.dll
                 echo "Created: license.dll (Windows $ARCH)"
                 ;;
             linux)
-                cp output/$OUTPUT_FILE license.so
+                cp output/$OUTPUT_FILE output/license.so
                 echo "Created: license.so (Linux $ARCH)"
                 ;;
             darwin)
-                cp output/$OUTPUT_FILE license.dylib
+                cp output/$OUTPUT_FILE output/license.dylib
                 echo "Created: license.dylib (macOS $ARCH)"
                 ;;
         esac
