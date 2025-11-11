@@ -46,15 +46,7 @@
         </el-table>
         <!-- 分页组件 -->
         <div class="pagination-container">
-          <el-pagination
-            v-model:current-page="currentPage"
-            v-model:page-size="pageSize"
-            :page-sizes="[10, 20, 50, 100]"
-            layout="total, sizes, prev, pager, next, jumper"
-            :total="total"
-            @size-change="handlePageChange"
-            @current-change="handlePageChange"
-          />
+          <div id="paginationChart" class="pagination-chart"></div>
         </div>
       </div>
     </div>
@@ -95,6 +87,7 @@ import axios from 'axios'
 const licenseList = ref([])
 const showAddDialog = ref(false)
 const chartInstance = ref(null)
+const paginationChartInstance = ref(null)
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(10)
@@ -189,6 +182,7 @@ const fetchLicenseList = async (page = 1, size = 10) => {
     }
     
     updateChart()
+    updatePaginationChart()
   } catch (error) {
     console.error('获取License列表失败:', error)
     ElMessage.error('获取License列表失败')
@@ -264,6 +258,316 @@ const refreshData = () => {
   ElMessage.success('数据已刷新')
 }
 
+
+
+// 初始化分页图表
+const initPaginationChart = () => {
+  const chartDom = document.getElementById('paginationChart')
+  if (chartDom) {
+    paginationChartInstance.value = echarts.init(chartDom)
+    updatePaginationChart()
+  }
+}
+
+// 更新分页图表
+const updatePaginationChart = () => {
+  if (!paginationChartInstance.value) return
+  
+  const totalPages = Math.ceil(total.value / pageSize.value)
+  const pageSizes = [10, 20, 50, 100]
+  
+  // 计算显示的页码范围
+  let startPage = Math.max(1, currentPage.value - 2)
+  let endPage = Math.min(totalPages, startPage + 4)
+  if (endPage - startPage < 4 && startPage > 1) {
+    startPage = Math.max(1, endPage - 4)
+  }
+  
+  // 生成页码数据
+  const pageItems = []
+  for (let i = startPage; i <= endPage; i++) {
+    pageItems.push({
+      name: i.toString(),
+      value: i,
+      itemStyle: {
+        color: i === currentPage.value ? '#1890ff' : '#f0f0f0'
+      }
+    })
+  }
+  
+  // 生成每页条数选项
+  const sizeItems = pageSizes.map(size => ({
+    name: size.toString(),
+    value: size,
+    itemStyle: {
+      color: size === pageSize.value ? '#1890ff' : '#f0f0f0'
+    }
+  }))
+  
+  const option = {
+    backgroundColor: 'transparent',
+    animation: false,
+    grid: {
+      left: '3%',
+      right: '3%',
+      top: '10%',
+      bottom: '10%',
+      containLabel: true
+    },
+    tooltip: {
+      show: false
+    },
+    graphic: [
+      // 总数显示
+      {
+        type: 'text',
+        left: 'left',
+        top: 'middle',
+        style: {
+          text: `共 ${total.value} 条`,
+          fill: '#333',
+          fontSize: 12
+        }
+      },
+      // 每页条数选择
+      {
+        type: 'group',
+        left: '20%',
+        top: 'middle',
+        children: sizeItems.map((item, index) => ({
+          type: 'rect',
+          shape: {
+            x: index * 40,
+            y: -15,
+            width: 30,
+            height: 30,
+            r: 4
+          },
+          style: {
+            fill: item.itemStyle.color
+          },
+          onclick: () => {
+            if (item.value !== pageSize.value) {
+              pageSize.value = item.value
+              currentPage.value = 1
+              fetchLicenseList(currentPage.value, pageSize.value)
+            }
+          }
+        })).concat(sizeItems.map((item, index) => ({
+          type: 'text',
+          left: index * 40 + 15,
+          top: 0,
+          style: {
+            text: item.name,
+            fill: '#fff',
+            fontSize: 12,
+            textVerticalAlign: 'middle',
+            textAlign: 'center'
+          },
+          onclick: () => {
+            if (item.value !== pageSize.value) {
+              pageSize.value = item.value
+              currentPage.value = 1
+              fetchLicenseList(currentPage.value, pageSize.value)
+            }
+          }
+        })))
+      },
+      // 上一页按钮
+      {
+        type: 'rect',
+        left: '45%',
+        top: 'middle',
+        shape: {
+          x: -20,
+          y: -15,
+          width: 40,
+          height: 30,
+          r: 4
+        },
+        style: {
+          fill: currentPage.value > 1 ? '#1890ff' : '#f0f0f0'
+        },
+        onclick: () => {
+          if (currentPage.value > 1) {
+            currentPage.value--
+            fetchLicenseList(currentPage.value, pageSize.value)
+          }
+        }
+      },
+      {
+        type: 'text',
+        left: '45%',
+        top: 'middle',
+        style: {
+          text: '上一页',
+          fill: currentPage.value > 1 ? '#fff' : '#666',
+          fontSize: 12,
+          textVerticalAlign: 'middle',
+          textAlign: 'center'
+        },
+        onclick: () => {
+          if (currentPage.value > 1) {
+            currentPage.value--
+            fetchLicenseList(currentPage.value, pageSize.value)
+          }
+        }
+      },
+      // 页码按钮
+      {
+        type: 'group',
+        left: '55%',
+        top: 'middle',
+        children: pageItems.map((item, index) => ({
+          type: 'rect',
+          shape: {
+            x: index * 40,
+            y: -15,
+            width: 30,
+            height: 30,
+            r: 4
+          },
+          style: {
+            fill: item.itemStyle.color
+          },
+          onclick: () => {
+            if (item.value !== currentPage.value) {
+              currentPage.value = item.value
+              fetchLicenseList(currentPage.value, pageSize.value)
+            }
+          }
+        })).concat(pageItems.map((item, index) => ({
+          type: 'text',
+          left: index * 40 + 15,
+          top: 0,
+          style: {
+            text: item.name,
+            fill: item.value === currentPage.value ? '#fff' : '#333',
+            fontSize: 12,
+            textVerticalAlign: 'middle',
+            textAlign: 'center'
+          },
+          onclick: () => {
+            if (item.value !== currentPage.value) {
+              currentPage.value = item.value
+              fetchLicenseList(currentPage.value, pageSize.value)
+            }
+          }
+        })))
+      },
+      // 下一页按钮
+      {
+        type: 'rect',
+        left: '75%',
+        top: 'middle',
+        shape: {
+          x: -20,
+          y: -15,
+          width: 40,
+          height: 30,
+          r: 4
+        },
+        style: {
+          fill: currentPage.value < totalPages ? '#1890ff' : '#f0f0f0'
+        },
+        onclick: () => {
+          if (currentPage.value < totalPages) {
+            currentPage.value++
+            fetchLicenseList(currentPage.value, pageSize.value)
+          }
+        }
+      },
+      {
+        type: 'text',
+        left: '75%',
+        top: 'middle',
+        style: {
+          text: '下一页',
+          fill: currentPage.value < totalPages ? '#fff' : '#666',
+          fontSize: 12,
+          textVerticalAlign: 'middle',
+          textAlign: 'center'
+        },
+        onclick: () => {
+          if (currentPage.value < totalPages) {
+            currentPage.value++
+            fetchLicenseList(currentPage.value, pageSize.value)
+          }
+        }
+      },
+      // 跳转输入框 (模拟)
+      {
+        type: 'group',
+        left: '85%',
+        top: 'middle',
+        children: [
+          {
+            type: 'text',
+            left: 0,
+            top: 0,
+            style: {
+              text: `跳至 ${currentPage.value}`,
+              fill: '#333',
+              fontSize: 12,
+              textVerticalAlign: 'middle',
+              textAlign: 'center'
+            }
+          },
+          {
+            type: 'rect',
+            shape: {
+              x: 40,
+              y: -15,
+              width: 50,
+              height: 30,
+              r: 4
+            },
+            style: {
+              fill: '#1890ff'
+            },
+            onclick: () => {
+              // 简单实现，实际应该有输入框
+              const pageNum = prompt('请输入页码:', currentPage.value)
+              if (pageNum && !isNaN(pageNum)) {
+                const num = parseInt(pageNum)
+                if (num >= 1 && num <= totalPages) {
+                  currentPage.value = num
+                  fetchLicenseList(currentPage.value, pageSize.value)
+                }
+              }
+            }
+          },
+          {
+            type: 'text',
+            left: 65,
+            top: 0,
+            style: {
+              text: 'GO',
+              fill: '#fff',
+              fontSize: 12,
+              textVerticalAlign: 'middle',
+              textAlign: 'center'
+            },
+            onclick: () => {
+              // 简单实现，实际应该有输入框
+              const pageNum = prompt('请输入页码:', currentPage.value)
+              if (pageNum && !isNaN(pageNum)) {
+                const num = parseInt(pageNum)
+                if (num >= 1 && num <= totalPages) {
+                  currentPage.value = num
+                  fetchLicenseList(currentPage.value, pageSize.value)
+                }
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+  
+  paginationChartInstance.value.setOption(option)
+}
+
 // 分页变化处理
 const handlePageChange = (page, size) => {
   currentPage.value = page
@@ -275,11 +579,15 @@ const handlePageChange = (page, size) => {
 onMounted(() => {
   fetchLicenseList(currentPage.value, pageSize.value)
   initChart()
+  initPaginationChart()
   
   // 窗口大小变化时重新渲染图表
   window.addEventListener('resize', () => {
     if (chartInstance.value) {
       chartInstance.value.resize()
+    }
+    if (paginationChartInstance.value) {
+      paginationChartInstance.value.resize()
     }
   })
 })
@@ -366,6 +674,12 @@ h1 {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+  min-height: 80px;
+}
+
+.pagination-chart {
+  width: 100%;
+  height: 80px;
 }
 
 .license-table:hover {
