@@ -10,51 +10,53 @@
     </div>
 
     <div class="license-content">
-      <!-- License统计图表 -->
-      <div class="license-chart">
-        <div id="licenseChart"></div>
-      </div>
-
-      <!-- License列表 -->
-      <div class="license-table">
-        <div class="table-header">
-          <h3>License列表</h3>
+      <div class="content-row">
+        <!-- License统计图表 - 小模块 -->
+        <div class="license-chart-small">
+          <div id="licenseChart"></div>
         </div>
-        <el-table :data="licenseList" style="width: 100%">
-          <el-table-column prop="id" label="ID" width="80" />
-          <el-table-column prop="customer" label="客户名称" width="150" />
-          <el-table-column prop="fingerprint" label="硬件指纹" width="180" />
-          <el-table-column prop="activated_at" label="激活时间" width="180">
-            <template #default="scope">
-              {{ formatDate(scope.row.activated_at) }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="expires_at" label="过期时间" width="180">
-            <template #default="scope">
-              {{ formatDate(scope.row.expires_at) }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="is_active" label="状态" width="100">
-            <template #default="scope">
-              <el-tag :type="scope.row.is_active ? 'success' : 'danger'">
-                {{ scope.row.is_active ? '激活' : '停用' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="150">
-            <template #default="scope">
-              <el-button size="small" @click="deactivateLicense(scope.row.id)" v-if="scope.row.is_active">
-                停用
-              </el-button>
-              <el-button size="small" type="danger" @click="deleteLicense(scope.row.id)">
-                删除
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-        <!-- 分页组件 -->
-        <div class="pagination-container">
-          <div id="paginationChart" class="pagination-chart"></div>
+        
+        <!-- License列表 -->
+        <div class="license-table">
+          <div class="table-header">
+            <h3>License列表</h3>
+          </div>
+          <el-table :data="licenseList" style="width: 100%">
+            <el-table-column prop="id" label="ID" width="80" />
+            <el-table-column prop="customer" label="客户名称" width="150" />
+            <el-table-column prop="fingerprint" label="硬件指纹" width="180" />
+            <el-table-column prop="activated_at" label="激活时间" width="180">
+              <template #default="scope">
+                {{ formatDate(scope.row.activated_at) }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="expires_at" label="过期时间" width="180">
+              <template #default="scope">
+                {{ formatDate(scope.row.expires_at) }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="is_active" label="状态" width="100">
+              <template #default="scope">
+                <el-tag :type="scope.row.is_active ? 'success' : 'danger'">
+                  {{ scope.row.is_active ? '激活' : '停用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="150">
+              <template #default="scope">
+                <el-button size="small" @click="deactivateLicense(scope.row.id)" v-if="scope.row.is_active">
+                  停用
+                </el-button>
+                <el-button size="small" type="danger" @click="deleteLicense(scope.row.id)">
+                  删除
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <!-- 分页组件 -->
+          <div class="pagination-container">
+            <div id="paginationChart" class="pagination-chart"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -328,12 +330,44 @@ const updatePaginationChart = () => {
     }
   }))
   
+  // 计算各组件的位置，确保在不同屏幕尺寸下都能正常显示
+  const containerWidth = 800 // 最大宽度
+  const leftMargin = 50 // 左边距
+  const rightMargin = 50 // 右边距
+  const availableWidth = containerWidth - leftMargin - rightMargin
+  
+  // 分配各部分的宽度
+  const totalWidth = 100 // 总数显示宽度
+  const pageSizeWidth = 180 // 每页条数选择宽度
+  const prevNextWidth = 80 // 上一页/下一页按钮宽度
+  const pageNumbersWidth = 40 * 5 // 页码按钮宽度 (最多显示5个页码)
+  const jumpWidth = 120 // 跳转输入框宽度
+  
+  // 计算各组件的起始位置
+  let currentX = leftMargin
+  const totalX = currentX
+  currentX += totalWidth + 20 // 20px间距
+  
+  const pageSizeX = currentX
+  currentX += pageSizeWidth + 20 // 20px间距
+  
+  const prevX = currentX
+  currentX += prevNextWidth + 10 // 10px间距
+  
+  const pageNumbersX = currentX
+  currentX += pageNumbersWidth + 10 // 10px间距
+  
+  const nextX = currentX
+  currentX += prevNextWidth + 20 // 20px间距
+  
+  const jumpX = currentX
+  
   const option = {
     backgroundColor: 'transparent',
     animation: false,
     grid: {
-      left: '3%',
-      right: '3%',
+      left: '0%',
+      right: '0%',
       top: '10%',
       bottom: '10%',
       containLabel: true
@@ -345,7 +379,7 @@ const updatePaginationChart = () => {
       // 总数显示
       {
         type: 'text',
-        left: 'left',
+        left: `${totalX}px`,
         top: 'middle',
         style: {
           text: `共 ${total.value} 条`,
@@ -356,173 +390,206 @@ const updatePaginationChart = () => {
       // 每页条数选择
       {
         type: 'group',
-        left: '20%',
+        left: `${pageSizeX}px`,
         top: 'middle',
-        children: sizeItems.map((item, index) => ({
-          type: 'rect',
-          shape: {
-            x: index * 40,
-            y: -15,
-            width: 30,
-            height: 30,
-            r: 4
-          },
-          style: {
-            fill: item.itemStyle.color
-          },
-          onclick: () => {
-            if (item.value !== pageSize.value) {
-              pageSize.value = item.value
-              currentPage.value = 1
-              fetchLicenseList(currentPage.value, pageSize.value)
+        children: [
+          // 每页条数标签
+          {
+            type: 'text',
+            left: 0,
+            top: 0,
+            style: {
+              text: '每页',
+              fill: '#666',
+              fontSize: 12,
+              textVerticalAlign: 'middle',
+              textAlign: 'center'
             }
-          }
-        })).concat(sizeItems.map((item, index) => ({
-          type: 'text',
-          left: index * 40 + 15,
-          top: 0,
-          style: {
-            text: item.name,
-            fill: '#fff',
-            fontSize: 12,
-            textVerticalAlign: 'middle',
-            textAlign: 'center'
           },
-          onclick: () => {
-            if (item.value !== pageSize.value) {
-              pageSize.value = item.value
-              currentPage.value = 1
-              fetchLicenseList(currentPage.value, pageSize.value)
+          // 每页条数选项
+          ...sizeItems.map((item, index) => ({
+            type: 'rect',
+            shape: {
+              x: 40 + index * 35,
+              y: -15,
+              width: 30,
+              height: 30,
+              r: 4
+            },
+            style: {
+              fill: item.itemStyle.color
+            },
+            onclick: () => {
+              if (item.value !== pageSize.value) {
+                pageSize.value = item.value
+                currentPage.value = 1
+                fetchLicenseList(currentPage.value, pageSize.value)
+              }
             }
-          }
-        })))
+          })),
+          ...sizeItems.map((item, index) => ({
+            type: 'text',
+            left: 55 + index * 35,
+            top: 0,
+            style: {
+              text: item.name,
+              fill: '#fff',
+              fontSize: 12,
+              textVerticalAlign: 'middle',
+              textAlign: 'center'
+            },
+            onclick: () => {
+              if (item.value !== pageSize.value) {
+                pageSize.value = item.value
+                currentPage.value = 1
+                fetchLicenseList(currentPage.value, pageSize.value)
+              }
+            }
+          }))
+        ]
       },
       // 上一页按钮
       {
-        type: 'rect',
-        left: '45%',
+        type: 'group',
+        left: `${prevX}px`,
         top: 'middle',
-        shape: {
-          x: -20,
-          y: -15,
-          width: 40,
-          height: 30,
-          r: 4
-        },
-        style: {
-          fill: currentPage.value > 1 ? '#1890ff' : '#f0f0f0'
-        },
-        onclick: () => {
-          if (currentPage.value > 1) {
-            currentPage.value--
-            fetchLicenseList(currentPage.value, pageSize.value)
+        children: [
+          {
+            type: 'rect',
+            shape: {
+              x: 0,
+              y: -15,
+              width: 70,
+              height: 30,
+              r: 4
+            },
+            style: {
+              fill: currentPage.value > 1 ? '#1890ff' : '#f0f0f0'
+            },
+            onclick: () => {
+              if (currentPage.value > 1) {
+                currentPage.value--
+                fetchLicenseList(currentPage.value, pageSize.value)
+              }
+            }
+          },
+          {
+            type: 'text',
+            left: 35,
+            top: 0,
+            style: {
+              text: '上一页',
+              fill: currentPage.value > 1 ? '#fff' : '#666',
+              fontSize: 12,
+              textVerticalAlign: 'middle',
+              textAlign: 'center'
+            },
+            onclick: () => {
+              if (currentPage.value > 1) {
+                currentPage.value--
+                fetchLicenseList(currentPage.value, pageSize.value)
+              }
+            }
           }
-        }
-      },
-      {
-        type: 'text',
-        left: '45%',
-        top: 'middle',
-        style: {
-          text: '上一页',
-          fill: currentPage.value > 1 ? '#fff' : '#666',
-          fontSize: 12,
-          textVerticalAlign: 'middle',
-          textAlign: 'center'
-        },
-        onclick: () => {
-          if (currentPage.value > 1) {
-            currentPage.value--
-            fetchLicenseList(currentPage.value, pageSize.value)
-          }
-        }
+        ]
       },
       // 页码按钮
       {
         type: 'group',
-        left: '55%',
+        left: `${pageNumbersX}px`,
         top: 'middle',
         children: pageItems.map((item, index) => ({
-          type: 'rect',
-          shape: {
-            x: index * 40,
-            y: -15,
-            width: 30,
-            height: 30,
-            r: 4
-          },
-          style: {
-            fill: item.itemStyle.color
-          },
-          onclick: () => {
-            if (item.value !== currentPage.value) {
-              currentPage.value = item.value
-              fetchLicenseList(currentPage.value, pageSize.value)
+          type: 'group',
+          children: [
+            {
+              type: 'rect',
+              shape: {
+                x: index * 40,
+                y: -15,
+                width: 30,
+                height: 30,
+                r: 4
+              },
+              style: {
+                fill: item.itemStyle.color
+              },
+              onclick: () => {
+                if (item.value !== currentPage.value) {
+                  currentPage.value = item.value
+                  fetchLicenseList(currentPage.value, pageSize.value)
+                }
+              }
+            },
+            {
+              type: 'text',
+              left: index * 40 + 15,
+              top: 0,
+              style: {
+                text: item.name,
+                fill: item.value === currentPage.value ? '#fff' : '#333',
+                fontSize: 12,
+                textVerticalAlign: 'middle',
+                textAlign: 'center'
+              },
+              onclick: () => {
+                if (item.value !== currentPage.value) {
+                  currentPage.value = item.value
+                  fetchLicenseList(currentPage.value, pageSize.value)
+                }
+              }
             }
-          }
-        })).concat(pageItems.map((item, index) => ({
-          type: 'text',
-          left: index * 40 + 15,
-          top: 0,
-          style: {
-            text: item.name,
-            fill: item.value === currentPage.value ? '#fff' : '#333',
-            fontSize: 12,
-            textVerticalAlign: 'middle',
-            textAlign: 'center'
-          },
-          onclick: () => {
-            if (item.value !== currentPage.value) {
-              currentPage.value = item.value
-              fetchLicenseList(currentPage.value, pageSize.value)
-            }
-          }
-        })))
+          ]
+        }))
       },
       // 下一页按钮
       {
-        type: 'rect',
-        left: '75%',
+        type: 'group',
+        left: `${nextX}px`,
         top: 'middle',
-        shape: {
-          x: -20,
-          y: -15,
-          width: 40,
-          height: 30,
-          r: 4
-        },
-        style: {
-          fill: currentPage.value < totalPages ? '#1890ff' : '#f0f0f0'
-        },
-        onclick: () => {
-          if (currentPage.value < totalPages) {
-            currentPage.value++
-            fetchLicenseList(currentPage.value, pageSize.value)
+        children: [
+          {
+            type: 'rect',
+            shape: {
+              x: 0,
+              y: -15,
+              width: 70,
+              height: 30,
+              r: 4
+            },
+            style: {
+              fill: currentPage.value < totalPages ? '#1890ff' : '#f0f0f0'
+            },
+            onclick: () => {
+              if (currentPage.value < totalPages) {
+                currentPage.value++
+                fetchLicenseList(currentPage.value, pageSize.value)
+              }
+            }
+          },
+          {
+            type: 'text',
+            left: 35,
+            top: 0,
+            style: {
+              text: '下一页',
+              fill: currentPage.value < totalPages ? '#fff' : '#666',
+              fontSize: 12,
+              textVerticalAlign: 'middle',
+              textAlign: 'center'
+            },
+            onclick: () => {
+              if (currentPage.value < totalPages) {
+                currentPage.value++
+                fetchLicenseList(currentPage.value, pageSize.value)
+              }
+            }
           }
-        }
+        ]
       },
-      {
-        type: 'text',
-        left: '75%',
-        top: 'middle',
-        style: {
-          text: '下一页',
-          fill: currentPage.value < totalPages ? '#fff' : '#666',
-          fontSize: 12,
-          textVerticalAlign: 'middle',
-          textAlign: 'center'
-        },
-        onclick: () => {
-          if (currentPage.value < totalPages) {
-            currentPage.value++
-            fetchLicenseList(currentPage.value, pageSize.value)
-          }
-        }
-      },
-      // 跳转输入框 (模拟)
+      // 跳转输入框
       {
         type: 'group',
-        left: '85%',
+        left: `${jumpX}px`,
         top: 'middle',
         children: [
           {
@@ -530,8 +597,8 @@ const updatePaginationChart = () => {
             left: 0,
             top: 0,
             style: {
-              text: `跳至 ${currentPage.value}`,
-              fill: '#333',
+              text: '跳至',
+              fill: '#666',
               fontSize: 12,
               textVerticalAlign: 'middle',
               textAlign: 'center'
@@ -540,40 +607,53 @@ const updatePaginationChart = () => {
           {
             type: 'rect',
             shape: {
-              x: 40,
+              x: 30,
               y: -15,
-              width: 50,
+              width: 40,
               height: 30,
               r: 4
             },
             style: {
-              fill: '#1890ff'
-            },
-            onclick: () => {
-              // 简单实现，实际应该有输入框
-              const pageNum = prompt('请输入页码:', currentPage.value)
-              if (pageNum && !isNaN(pageNum)) {
-                const num = parseInt(pageNum)
-                if (num >= 1 && num <= totalPages) {
-                  currentPage.value = num
-                  fetchLicenseList(currentPage.value, pageSize.value)
-                }
-              }
+              fill: '#f0f0f0'
             }
           },
           {
             type: 'text',
-            left: 65,
+            left: 50,
             top: 0,
             style: {
-              text: 'GO',
-              fill: '#fff',
+              text: currentPage.value.toString(),
+              fill: '#333',
               fontSize: 12,
               textVerticalAlign: 'middle',
               textAlign: 'center'
+            }
+          },
+          {
+            type: 'text',
+            left: 75,
+            top: 0,
+            style: {
+              text: '页',
+              fill: '#666',
+              fontSize: 12,
+              textVerticalAlign: 'middle',
+              textAlign: 'center'
+            }
+          },
+          {
+            type: 'rect',
+            shape: {
+              x: 30,
+              y: -15,
+              width: 40,
+              height: 30,
+              r: 4
+            },
+            style: {
+              fill: 'transparent'
             },
             onclick: () => {
-              // 简单实现，实际应该有输入框
               const pageNum = prompt('请输入页码:', currentPage.value)
               if (pageNum && !isNaN(pageNum)) {
                 const num = parseInt(pageNum)
@@ -621,8 +701,8 @@ onMounted(() => {
 <style scoped>
 .license-container {
   padding: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
   min-height: 100vh;
   background-color: #f5f7fa;
 }
@@ -658,6 +738,27 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+.content-row {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.license-chart-small {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  padding: 20px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  width: 350px;
+  flex-shrink: 0;
+}
+
+.license-chart-small:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
 }
 
 .license-chart {
@@ -698,12 +799,13 @@ h1 {
 .pagination-container {
   margin-top: 20px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   min-height: 80px;
 }
 
 .pagination-chart {
   width: 100%;
+  max-width: 800px;
   height: 80px;
 }
 
@@ -714,7 +816,7 @@ h1 {
 
 #licenseChart {
   width: 100%;
-  height: 250px; /* 减小图表高度 */
+  height: 300px; /* 适应小模块的高度 */
 }
 
 /* 响应式设计 */
