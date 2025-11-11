@@ -61,6 +61,9 @@
               :page-sizes="[10, 20, 50, 100]"
               :total="total"
               layout="total, sizes, prev, pager, next, jumper"
+              prev-text="上一页"
+              next-text="下一页"
+              :pager-count="7"
               @size-change="handleSizeChange"
               @current-change="handleCurrentChange"
             />
