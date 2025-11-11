@@ -251,7 +251,7 @@ func ActivateHandler(pubKeyPath, privateKeyPath string, db *database.DB) gin.Han
 
 			// 如果已有激活记录且仍处于活动状态，返回错误提示指纹已存在
 			if existingActivation != nil && existingActivation.IsActive {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "fingerprint already exists and is active"})
+				c.JSON(http.StatusBadRequest, gin.H{"error": "当前机器码已经存在，不能重复激活"})
 				return
 			}
 

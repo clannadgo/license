@@ -378,7 +378,9 @@ const addLicense = async () => {
     }
   } catch (error) {
     console.error('添加License失败:', error)
-    ElMessage.error('添加License失败')
+    // 显示后端返回的具体错误信息
+    const errorMessage = error.response?.data?.error || error.message || '添加License失败'
+    ElMessage.error(errorMessage)
   }
 }
 
