@@ -84,6 +84,14 @@
         </el-form-item>
         <el-form-item label="硬件指纹" required>
           <el-input v-model="newLicense.fingerprint" placeholder="请输入硬件指纹" />
+          <div v-if="newLicense.fingerprint" class="fingerprint-format" :class="{ 'format-valid': validateFingerprintFormat(newLicense.fingerprint), 'format-invalid': !validateFingerprintFormat(newLicense.fingerprint) }">
+            <el-icon v-if="validateFingerprintFormat(newLicense.fingerprint)" style="color: #67C23A; margin-right: 5px;"><Check /></el-icon>
+            <el-icon v-else style="color: #F56C6C; margin-right: 5px;"><Close /></el-icon>
+            格式校验：{{ validateFingerprintFormat(newLicense.fingerprint) ? '正确' : '不正确' }}
+          </div>
+          <div style="color: #909399; font-size: 12px; margin-top: 5px;">
+            正确格式应为XXXX-XXXX-XXXX-XXXX（4组4位字母或数字）
+          </div>
         </el-form-item>
         <el-form-item label="有效期">
           <div class="validity-container">
