@@ -221,6 +221,45 @@ func (db *DB) GetLicenseActivationByFingerprint(fingerprint string) (*LicenseAct
 	return &activation, nil
 }
 
+// GetActiveLicenseActivationByFingerprint 根据指纹获取有效的许可证激活记录
+func (db *DB) GetActiveLicenseActivationByFingerprint(fingerprint string) (*LicenseActivation, error) {
+	query := `
+	SELECT id, customer, fingerprint, license, description, issued_at, expires_at, activated_at, is_active
+	FROM license_activations
+	WHERE fingerprint = ? AND is_active = 1 AND expires_at > ?
+	ORDER BY activated_at DESC
+	LIMIT 1
+	`
+
+	var activation LicenseActivation
+	var issuedAt, expiresAt, activatedAt int64
+
+	err := db.conn.QueryRow(query, fingerprint, time.Now().Unix()).Scan(
+		&activation.ID,
+		&activation.Customer,
+		&activation.Fingerprint,
+		&activation.License,
+		&activation.Description,
+		&issuedAt,
+		&expiresAt,
+		&activatedAt,
+		&activation.IsActive,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get active license activation: %v", err)
+	}
+
+	activation.IssuedAt = time.Unix(issuedAt, 0)
+	activation.ExpiresAt = time.Unix(expiresAt, 0)
+	activation.ActivatedAt = time.Unix(activatedAt, 0)
+
+	return &activation, nil
+}
+
 // GetLicenseActivationsWithPagination 分页获取许可证激活记录
 func (db *DB) GetLicenseActivationsWithPagination(page, pageSize int) ([]LicenseActivation, int64, error) {
 	if page < 1 {

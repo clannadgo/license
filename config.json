@@ -1,0 +1,5 @@
+{
+    "privateKeyPath": "private.pem",
+    "publicKeyPath": "public.pem",
+    "licenseStorePath": "license.lic"
+}

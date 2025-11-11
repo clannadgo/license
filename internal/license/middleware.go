@@ -25,7 +25,7 @@ import (
 // ------------------ 公钥加载 ------------------
 
 func loadPublicKey(path string) (*rsa.PublicKey, error) {
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -99,10 +99,9 @@ func DecodeActivationCodeToHex(code string) (string, error) {
 
 // ------------------ License Generation ------------------
 
-func generateLicense(pubKeyPath, customer, fingerprint string, issuedAt time.Time, exp int64) (string, error) {
+func generateLicense(pubKeyPath, privateKeyPath, customer, fingerprint string, issuedAt time.Time, exp int64) (string, error) {
 	// Load private key (assuming it's in the same directory as public key with .key extension)
-	privKeyPath := strings.TrimSuffix(pubKeyPath, ".pub") + ".key"
-	b, err := ioutil.ReadFile(privKeyPath)
+	b, err := os.ReadFile(privateKeyPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read private key: %v", err)
 	}
@@ -112,7 +111,16 @@ func generateLicense(pubKeyPath, customer, fingerprint string, issuedAt time.Tim
 	}
 	privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse private key: %v", err)
+		// 尝试使用PKCS8格式解析
+		privKeyInterface, err2 := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err2 != nil {
+			return "", fmt.Errorf("failed to parse private key: %v", err)
+		}
+		var ok bool
+		privKey, ok = privKeyInterface.(*rsa.PrivateKey)
+		if !ok {
+			return "", fmt.Errorf("not an RSA private key")
+		}
 	}
 
 	// Create signing key
@@ -153,7 +161,7 @@ func generateLicense(pubKeyPath, customer, fingerprint string, issuedAt time.Tim
 
 // ------------------ Activate Handler ------------------
 
-func ActivateHandler(pubKeyPath, storePath string, db *database.DB) gin.HandlerFunc {
+func ActivateHandler(pubKeyPath, privateKeyPath string, db *database.DB) gin.HandlerFunc {
 	pub, err := loadPublicKey(pubKeyPath)
 	if err != nil {
 		panic(err)
@@ -210,7 +218,7 @@ func ActivateHandler(pubKeyPath, storePath string, db *database.DB) gin.HandlerF
 		).Unix()
 
 		// 生成新的license
-		newLicense, err := generateLicense(pubKeyPath, req.Customer, fp, now, exp)
+		newLicense, err := generateLicense(pubKeyPath, privateKeyPath, req.Customer, fp, now, exp)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate license: " + err.Error()})
 			return
@@ -231,11 +239,7 @@ func ActivateHandler(pubKeyPath, storePath string, db *database.DB) gin.HandlerF
 			return
 		}
 
-		// persist license
-		if err := os.WriteFile(storePath, []byte(req.License), 0600); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "save failed"})
-			return
-		}
+		// license已通过数据库存储，不需要写入文件系统
 
 		// 记录激活信息到数据库
 		if db != nil {
@@ -280,7 +284,7 @@ func ActivateHandler(pubKeyPath, storePath string, db *database.DB) gin.HandlerF
 
 // ------------------ License Middleware ------------------
 
-func LicenseMiddleware(pubKeyPath, storePath string) gin.HandlerFunc {
+func LicenseMiddleware(pubKeyPath, storePath string, db *database.DB) gin.HandlerFunc {
 	pub, err := loadPublicKey(pubKeyPath)
 	if err != nil {
 		panic(err)
@@ -296,13 +300,7 @@ func LicenseMiddleware(pubKeyPath, storePath string) gin.HandlerFunc {
 			return
 		}
 
-		// read persisted license
-		b, err := ioutil.ReadFile(storePath)
-		if err != nil {
-			c.AbortWithStatusJSON(403, gin.H{"error": "no license, please activate"})
-			return
-		}
-
+		// 获取本机激活码并转 hex
 		fpCode := hwid.GetFingerprint() // XXXX-XXXX-XXXX-XXXX
 		localHex, err := DecodeActivationCodeToHex(fpCode)
 		if err != nil {
@@ -310,7 +308,30 @@ func LicenseMiddleware(pubKeyPath, storePath string) gin.HandlerFunc {
 			return
 		}
 
-		cl, err := verifyJWS(pub, string(b))
+		// 从数据库获取最新的有效license
+		var licenseStr string
+		if db != nil {
+			activation, err := db.GetActiveLicenseActivationByFingerprint(localHex)
+			if err != nil {
+				c.AbortWithStatusJSON(500, gin.H{"error": "database error"})
+				return
+			}
+			if activation != nil {
+				licenseStr = activation.License
+			}
+		}
+
+		// 如果数据库中没有找到，尝试从文件读取（向后兼容）
+		if licenseStr == "" {
+			b, err := ioutil.ReadFile(storePath)
+			if err != nil {
+				c.AbortWithStatusJSON(403, gin.H{"error": "no license, please activate"})
+				return
+			}
+			licenseStr = string(b)
+		}
+
+		cl, err := verifyJWS(pub, licenseStr)
 		if err != nil {
 			c.AbortWithStatusJSON(403, gin.H{"error": "invalid license: " + err.Error()})
 			return

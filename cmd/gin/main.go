@@ -3,9 +3,11 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
+	"license/internal/config"
 	"license/internal/database"
 	"license/internal/hwid"
 	"license/internal/license"
@@ -45,9 +47,16 @@ func main() {
 	r.Use(gin.Recovery())
 
 	// 许可证中间件配置
-	pubKeyPath := "public.pem"
-	storePath := "license.lic"
-
+	pubKeyPath := config.Conf.PublicKeyPath
+	storePath := config.Conf.LicenseStorePath
+	privateKeyPath := config.Conf.PrivateKeyPath
+	// 判断文件是否存在
+	if _, err := os.Stat(pubKeyPath); os.IsNotExist(err) {
+		log.Fatalf("Public key file not found: %s", pubKeyPath)
+	}
+	if _, err := os.Stat(storePath); os.IsNotExist(err) {
+		log.Fatalf("Private key file not found: %s", storePath)
+	}
 	// 健康检查端点
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -68,7 +77,7 @@ func main() {
 		})
 
 		// 许可证激活端点
-		api.POST("/license/activate", license.ActivateHandler(pubKeyPath, storePath, db))
+		api.POST("/license/activate", license.ActivateHandler(pubKeyPath, privateKeyPath, db))
 
 		// 获取所有许可证激活记录（支持分页）
 		api.GET("/license/activations", func(c *gin.Context) {
@@ -159,7 +168,7 @@ func main() {
 	}
 
 	// 应用许可证中间件到所有路由（除了健康检查和API路由组）
-	r.Use(license.LicenseMiddleware(pubKeyPath, storePath))
+	r.Use(license.LicenseMiddleware(pubKeyPath, storePath, db))
 
 	// 启动服务器
 	log.Println("Starting license service on :8080")
