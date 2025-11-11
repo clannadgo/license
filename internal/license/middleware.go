@@ -17,6 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/square/go-jose/v3"
+	"license/internal/database"
 	"license/internal/hwid"
 )
 
@@ -97,7 +98,7 @@ func DecodeActivationCodeToHex(code string) (string, error) {
 
 // ------------------ Activate Handler ------------------
 
-func ActivateHandler(pubKeyPath, storePath string) gin.HandlerFunc {
+func ActivateHandler(pubKeyPath, storePath string, db *database.DB) gin.HandlerFunc {
 	pub, err := loadPublicKey(pubKeyPath)
 	if err != nil {
 		panic(err)
@@ -135,6 +136,42 @@ func ActivateHandler(pubKeyPath, storePath string) gin.HandlerFunc {
 		if err := os.WriteFile(storePath, []byte(req.License), 0600); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "save failed"})
 			return
+		}
+
+		// 记录激活信息到数据库
+		if db != nil {
+			// 检查是否已有该指纹的激活记录
+			existingActivation, err := db.GetLicenseActivationByFingerprint(localHex)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+				return
+			}
+
+			// 如果已有激活记录，将其标记为非活动状态
+			if existingActivation != nil {
+				err = db.DeactivateLicense(existingActivation.ID)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
+					return
+				}
+			}
+
+			// 创建新的激活记录
+			activation := &database.LicenseActivation{
+				Customer:    cl.Customer,
+				Fingerprint: localHex,
+				License:     req.License,
+				IssuedAt:    time.Unix(cl.Iat, 0),
+				ExpiresAt:   time.Unix(cl.Exp, 0),
+				ActivatedAt: time.Now(),
+				IsActive:    true,
+			}
+
+			err = db.InsertLicenseActivation(activation)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record activation"})
+				return
+			}
 		}
 
 		c.JSON(http.StatusOK, gin.H{"ok": true, "customer": cl.Customer, "exp": cl.Exp})
