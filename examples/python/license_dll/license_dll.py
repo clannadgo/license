@@ -42,6 +42,11 @@ class LicenseDLL:
             if not os.path.exists(library_path):
                 project_root = os.path.dirname(os.path.dirname(os.path.dirname(parent_dir)))
                 library_path = os.path.join(project_root, "examples", "dll", library_name)
+            
+            # If still not found, try the examples/dll/output directory
+            if not os.path.exists(library_path):
+                project_root = os.path.dirname(os.path.dirname(os.path.dirname(parent_dir)))
+                library_path = os.path.join(project_root, "examples", "dll", "output", library_name)
         
         if not os.path.exists(library_path):
             raise FileNotFoundError(f"License library not found at {library_path}")
@@ -109,7 +114,8 @@ class LicenseDLL:
             raise RuntimeError("Failed to generate fingerprint")
         
         fingerprint = result.decode('utf-8')
-        self.dll.FreeString(result)
+        # 不调用FreeString，让CGO的垃圾回收处理
+        # self.dll.FreeString(result)
         return fingerprint
     
     def verify_license(self, public_key_path: str, license_content: str) -> Tuple[int, str]:
