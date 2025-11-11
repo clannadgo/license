@@ -20,6 +20,7 @@ type LicenseActivation struct {
 	ExpiresAt   time.Time `json:"expires_at"`
 	ActivatedAt time.Time `json:"activated_at"`
 	IsActive    bool      `json:"is_active"`
+	IsDelete    bool      `json:"is_delete"`
 }
 
 // DB 数据库连接
@@ -47,6 +48,24 @@ func NewDB(dbPath string) (*DB, error) {
 	}
 
 	return db, nil
+}
+
+// StartExpiredLicenseChecker 启动一个协程，定期检查并更新过期的许可证
+func (db *DB) StartExpiredLicenseChecker() {
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				err := db.CleanupExpiredLicenses()
+				if err != nil {
+					log.Printf("Error checking expired licenses: %v", err)
+				}
+			}
+		}
+	}()
 }
 
 // Close 关闭数据库连接
@@ -110,6 +129,7 @@ func (db *DB) runMigrations() error {
 
 	// 检查是否需要添加description字段
 	var hasDescriptionColumn bool
+	var hasDeleteColumn bool
 	checkColumnQuery := `PRAGMA table_info(license_activations);`
 	rows, err := db.conn.Query(checkColumnQuery)
 	if err != nil {
@@ -130,7 +150,9 @@ func (db *DB) runMigrations() error {
 
 		if name == "description" {
 			hasDescriptionColumn = true
-			break
+		}
+		if name == "is_delete" {
+			hasDeleteColumn = true
 		}
 	}
 
@@ -150,6 +172,24 @@ func (db *DB) runMigrations() error {
 		}
 
 		log.Println("Database migration completed: Added description column to license_activations table")
+	}
+
+	// 如果没有is_delete字段，则添加
+	if !hasDeleteColumn {
+		migrationQuery := `ALTER TABLE license_activations ADD COLUMN is_delete BOOLEAN NOT NULL DEFAULT 0;`
+		_, err := db.conn.Exec(migrationQuery)
+		if err != nil {
+			return fmt.Errorf("failed to add is_delete column: %v", err)
+		}
+
+		// 记录迁移
+		insertMigrationQuery := `INSERT INTO schema_migrations (version) VALUES ('add_is_delete_column');`
+		_, err = db.conn.Exec(insertMigrationQuery)
+		if err != nil {
+			return fmt.Errorf("failed to record migration: %v", err)
+		}
+
+		log.Println("Database migration completed: Added is_delete column to license_activations table")
 	}
 
 	return nil
@@ -185,9 +225,9 @@ func (db *DB) InsertLicenseActivation(activation *LicenseActivation) error {
 // GetLicenseActivationByFingerprint 根据指纹获取许可证激活记录
 func (db *DB) GetLicenseActivationByFingerprint(fingerprint string) (*LicenseActivation, error) {
 	query := `
-	SELECT id, customer, fingerprint, license, description, issued_at, expires_at, activated_at, is_active
+	SELECT id, customer, fingerprint, license, description, issued_at, expires_at, activated_at, is_active, is_delete
 	FROM license_activations
-	WHERE fingerprint = ? AND is_active = 1
+	WHERE fingerprint = ? AND is_active = 1 AND is_delete = 0
 	ORDER BY activated_at DESC
 	LIMIT 1
 	`
@@ -205,6 +245,7 @@ func (db *DB) GetLicenseActivationByFingerprint(fingerprint string) (*LicenseAct
 		&expiresAt,
 		&activatedAt,
 		&activation.IsActive,
+		&activation.IsDelete,
 	)
 
 	if err != nil {
@@ -224,9 +265,9 @@ func (db *DB) GetLicenseActivationByFingerprint(fingerprint string) (*LicenseAct
 // GetActiveLicenseActivationByFingerprint 根据指纹获取有效的许可证激活记录
 func (db *DB) GetActiveLicenseActivationByFingerprint(fingerprint string) (*LicenseActivation, error) {
 	query := `
-	SELECT id, customer, fingerprint, license, description, issued_at, expires_at, activated_at, is_active
+	SELECT id, customer, fingerprint, license, description, issued_at, expires_at, activated_at, is_active, is_delete
 	FROM license_activations
-	WHERE fingerprint = ? AND is_active = 1 AND expires_at > ?
+	WHERE fingerprint = ? AND is_active = 1 AND expires_at > ? AND is_delete = 0
 	ORDER BY activated_at DESC
 	LIMIT 1
 	`
@@ -244,6 +285,7 @@ func (db *DB) GetActiveLicenseActivationByFingerprint(fingerprint string) (*Lice
 		&expiresAt,
 		&activatedAt,
 		&activation.IsActive,
+		&activation.IsDelete,
 	)
 
 	if err != nil {
@@ -251,6 +293,44 @@ func (db *DB) GetActiveLicenseActivationByFingerprint(fingerprint string) (*Lice
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to get active license activation: %v", err)
+	}
+
+	activation.IssuedAt = time.Unix(issuedAt, 0)
+	activation.ExpiresAt = time.Unix(expiresAt, 0)
+	activation.ActivatedAt = time.Unix(activatedAt, 0)
+
+	return &activation, nil
+}
+
+// GetLicenseActivationByID 根据ID获取许可证激活记录
+func (db *DB) GetLicenseActivationByID(id int64) (*LicenseActivation, error) {
+	query := `
+	SELECT id, customer, fingerprint, license, description, issued_at, expires_at, activated_at, is_active, is_delete
+	FROM license_activations
+	WHERE id = ? AND is_delete = 0
+	`
+
+	var activation LicenseActivation
+	var issuedAt, expiresAt, activatedAt int64
+
+	err := db.conn.QueryRow(query, id).Scan(
+		&activation.ID,
+		&activation.Customer,
+		&activation.Fingerprint,
+		&activation.License,
+		&activation.Description,
+		&issuedAt,
+		&expiresAt,
+		&activatedAt,
+		&activation.IsActive,
+		&activation.IsDelete,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get license activation by ID: %v", err)
 	}
 
 	activation.IssuedAt = time.Unix(issuedAt, 0)
@@ -273,7 +353,7 @@ func (db *DB) GetLicenseActivationsWithPagination(page, pageSize int) ([]License
 
 	// 查询总数
 	var total int64
-	totalQuery := `SELECT COUNT(*) FROM license_activations`
+	totalQuery := `SELECT COUNT(*) FROM license_activations WHERE is_delete = 0`
 	err := db.conn.QueryRow(totalQuery).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count license activations: %v", err)
@@ -281,8 +361,9 @@ func (db *DB) GetLicenseActivationsWithPagination(page, pageSize int) ([]License
 
 	// 分页查询
 	query := `
-	SELECT id, customer, fingerprint, license, description, issued_at, expires_at, activated_at, is_active
+	SELECT id, customer, fingerprint, license, description, issued_at, expires_at, activated_at, is_active, is_delete
 	FROM license_activations
+	WHERE is_delete = 0
 	ORDER BY activated_at DESC
 	LIMIT ? OFFSET ?
 	`
@@ -309,6 +390,7 @@ func (db *DB) GetLicenseActivationsWithPagination(page, pageSize int) ([]License
 			&expiresAt,
 			&activatedAt,
 			&activation.IsActive,
+			&activation.IsDelete,
 		)
 
 		if err != nil {
@@ -394,9 +476,10 @@ func (db *DB) DeactivateLicense(id int) error {
 // GetExpiredLicenses 获取已过期的许可证
 func (db *DB) GetExpiredLicenses() ([]LicenseActivation, error) {
 	query := `
-	SELECT id, customer, fingerprint, license, description, issued_at, expires_at, activated_at, is_active
+	SELECT id, customer, fingerprint, license, description, issued_at, expires_at, activated_at, is_active, is_delete
 	FROM license_activations
-	WHERE expires_at < ? AND is_active = 1
+	WHERE expires_at < ? AND is_active = 1 AND is_delete = 0
+	ORDER BY expires_at ASC
 	`
 
 	rows, err := db.conn.Query(query, time.Now().Unix())
@@ -421,6 +504,7 @@ func (db *DB) GetExpiredLicenses() ([]LicenseActivation, error) {
 			&expiresAt,
 			&activatedAt,
 			&activation.IsActive,
+			&activation.IsDelete,
 		)
 
 		if err != nil {
@@ -443,7 +527,7 @@ func (db *DB) GetExpiredLicenses() ([]LicenseActivation, error) {
 
 // CleanupExpiredLicenses 将已过期的许可证标记为非活动状态
 func (db *DB) CleanupExpiredLicenses() error {
-	query := `UPDATE license_activations SET is_active = 0 WHERE expires_at < ? AND is_active = 1`
+	query := `UPDATE license_activations SET is_active = 0 WHERE expires_at < ? AND is_active = 1 AND is_delete = 0`
 
 	result, err := db.conn.Exec(query, time.Now().Unix())
 	if err != nil {
@@ -462,13 +546,13 @@ func (db *DB) CleanupExpiredLicenses() error {
 	return nil
 }
 
-// DeleteLicenseActivation 删除许可证激活记录
+// DeleteLicenseActivation 软删除许可证激活记录（标记为已删除）
 func (db *DB) DeleteLicenseActivation(id int) error {
-	query := `DELETE FROM license_activations WHERE id = ?`
+	query := `UPDATE license_activations SET is_delete = 1 WHERE id = ?`
 
 	result, err := db.conn.Exec(query, id)
 	if err != nil {
-		return fmt.Errorf("failed to delete license activation: %v", err)
+		return fmt.Errorf("failed to soft delete license activation: %v", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()

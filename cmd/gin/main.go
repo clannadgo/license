@@ -29,6 +29,9 @@ func main() {
 		log.Printf("Warning: Failed to cleanup expired licenses: %v", err)
 	}
 
+	// 启动协程，定期检查过期的许可证
+	db.StartExpiredLicenseChecker()
+
 	// 创建Gin路由器
 	r := gin.Default()
 

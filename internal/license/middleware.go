@@ -9,7 +9,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -323,7 +322,7 @@ func LicenseMiddleware(pubKeyPath, storePath string, db *database.DB) gin.Handle
 
 		// 如果数据库中没有找到，尝试从文件读取（向后兼容）
 		if licenseStr == "" {
-			b, err := ioutil.ReadFile(storePath)
+			b, err := os.ReadFile(storePath)
 			if err != nil {
 				c.AbortWithStatusJSON(403, gin.H{"error": "no license, please activate"})
 				return
