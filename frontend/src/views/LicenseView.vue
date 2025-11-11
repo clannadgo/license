@@ -139,10 +139,15 @@
             </template>
           </el-input>
         </div>
+        <div class="fingerprint-format" :class="{ 'format-valid': validateFingerprintFormat(currentFingerprint), 'format-invalid': !validateFingerprintFormat(currentFingerprint) }">
+          <el-icon v-if="validateFingerprintFormat(currentFingerprint)" style="color: #67C23A; margin-right: 5px;"><Check /></el-icon>
+          <el-icon v-else style="color: #F56C6C; margin-right: 5px;"><Close /></el-icon>
+          格式校验：{{ validateFingerprintFormat(currentFingerprint) ? '正确' : '不正确' }}
+        </div>
         <div class="fingerprint-tip">
           <el-alert
             title="提示"
-            description="此指纹基于当前机器硬件信息生成，可用于License授权。请妥善保管此指纹。"
+            description="此指纹基于当前机器硬件信息生成，可用于License授权。仅用于测试，生产环境请使用真实机器生成。正确格式应为XXXX-XXXX-XXXX-XXXX（4组4位字母或数字）"
             type="info"
             show-icon
             :closable="false"
@@ -162,6 +167,7 @@
 import { ref, onMounted } from 'vue'
 import * as echarts from 'echarts'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Check, Close } from '@element-plus/icons-vue'
 import axios from 'axios'
 
 // 数据定义
@@ -304,6 +310,12 @@ const addLicense = async () => {
       return
     }
     
+    // 验证指纹格式
+    if (!validateFingerprintFormat(newLicense.value.fingerprint)) {
+      ElMessage.error('硬件指纹格式不正确，应为XXXX-XXXX-XXXX-XXXX格式（4组4位字母或数字）')
+      return
+    }
+    
     // 验证至少有一个时间单位被设置
     if (newLicense.value.validityDays === 0 && 
         newLicense.value.validityHours === 0 && 
@@ -407,12 +419,25 @@ const refreshData = () => {
   ElMessage.success('数据已刷新')
 }
 
+// 指纹格式校验函数
+const validateFingerprintFormat = (fingerprint) => {
+  // 指纹格式应为：XXXX-XXXX-XXXX-XXXX，其中X为字母或数字
+  const pattern = /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i
+  return pattern.test(fingerprint)
+}
+
 // 生成指纹
 const generateFingerprint = async () => {
   try {
     const response = await axios.get(`${API_BASE_URL}/system/fingerprint`)
     if (response.data && response.data.fingerprint) {
       currentFingerprint.value = response.data.fingerprint
+      
+      // 验证指纹格式
+      if (!validateFingerprintFormat(currentFingerprint.value)) {
+        ElMessage.warning('生成的指纹格式可能不正确，请检查')
+      }
+      
       showFingerprintDialog.value = true
     } else {
       ElMessage.error('获取指纹失败')
@@ -762,6 +787,27 @@ h1 {
 
 .fingerprint-value {
   margin-bottom: 15px;
+}
+
+.fingerprint-format {
+  margin-bottom: 15px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+}
+
+.format-valid {
+  background-color: #f0f9ff;
+  border: 1px solid #b3d8ff;
+  color: #409eff;
+}
+
+.format-invalid {
+  background-color: #fef0f0;
+  border: 1px solid #fbc4c4;
+  color: #f56c6c;
 }
 
 .fingerprint-tip {
