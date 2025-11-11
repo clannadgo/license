@@ -22,16 +22,16 @@
             <h3>License列表</h3>
           </div>
           <div class="table-container">
-            <el-table :data="licenseList" style="width: 100%">
+            <el-table :data="licenseList" style="width: 100%" table-layout="fixed">
               <el-table-column prop="id" label="ID" width="80" />
-              <el-table-column prop="customer" label="客户名称" width="150" />
-              <el-table-column prop="fingerprint" label="硬件指纹" width="180" />
-              <el-table-column prop="activated_at" label="激活时间" width="180">
+              <el-table-column prop="customer" label="客户名称" min-width="120" />
+              <el-table-column prop="fingerprint" label="硬件指纹" min-width="150" />
+              <el-table-column prop="activated_at" label="激活时间" min-width="150">
                 <template #default="scope">
                   {{ formatDate(scope.row.activated_at) }}
                 </template>
               </el-table-column>
-              <el-table-column prop="expires_at" label="过期时间" width="180">
+              <el-table-column prop="expires_at" label="过期时间" min-width="150">
                 <template #default="scope">
                   {{ formatDate(scope.row.expires_at) }}
                 </template>
@@ -426,6 +426,35 @@ h1 {
   flex: 1; /* 表格容器填充剩余空间 */
   overflow: auto; /* 添加滚动条以防内容过多 */
   min-height: 0; /* 确保flex子元素可以缩小 */
+}
+
+/* 表格样式调整，确保每条记录宽度一致 */
+.table-container :deep(.el-table) {
+  width: 100% !important; /* 确保表格宽度为100% */
+}
+
+.table-container :deep(.el-table__body-wrapper) {
+  width: 100% !important;
+}
+
+.table-container :deep(.el-table__header-wrapper) {
+  width: 100% !important;
+}
+
+.table-container :deep(.el-table__body) {
+  width: 100% !important;
+}
+
+.table-container :deep(.el-table__header) {
+  width: 100% !important;
+}
+
+.table-container :deep(.el-table__row) {
+  width: 100% !important;
+}
+
+.table-container :deep(.el-table__cell) {
+  padding: 12px 0; /* 调整单元格内边距 */
 }
 
 .pagination-container {
