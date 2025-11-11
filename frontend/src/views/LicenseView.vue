@@ -21,38 +21,40 @@
           <div class="table-header">
             <h3>License列表</h3>
           </div>
-          <el-table :data="licenseList" style="width: 100%">
-            <el-table-column prop="id" label="ID" width="80" />
-            <el-table-column prop="customer" label="客户名称" width="150" />
-            <el-table-column prop="fingerprint" label="硬件指纹" width="180" />
-            <el-table-column prop="activated_at" label="激活时间" width="180">
-              <template #default="scope">
-                {{ formatDate(scope.row.activated_at) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="expires_at" label="过期时间" width="180">
-              <template #default="scope">
-                {{ formatDate(scope.row.expires_at) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="is_active" label="状态" width="100">
-              <template #default="scope">
-                <el-tag :type="scope.row.is_active ? 'success' : 'danger'">
-                  {{ scope.row.is_active ? '激活' : '停用' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="150">
-              <template #default="scope">
-                <el-button size="small" @click="deactivateLicense(scope.row.id)" v-if="scope.row.is_active">
-                  停用
-                </el-button>
-                <el-button size="small" type="danger" @click="deleteLicense(scope.row.id)">
-                  删除
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
+          <div class="table-container">
+            <el-table :data="licenseList" style="width: 100%">
+              <el-table-column prop="id" label="ID" width="80" />
+              <el-table-column prop="customer" label="客户名称" width="150" />
+              <el-table-column prop="fingerprint" label="硬件指纹" width="180" />
+              <el-table-column prop="activated_at" label="激活时间" width="180">
+                <template #default="scope">
+                  {{ formatDate(scope.row.activated_at) }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="expires_at" label="过期时间" width="180">
+                <template #default="scope">
+                  {{ formatDate(scope.row.expires_at) }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="is_active" label="状态" width="100">
+                <template #default="scope">
+                  <el-tag :type="scope.row.is_active ? 'success' : 'danger'">
+                    {{ scope.row.is_active ? '激活' : '停用' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="150">
+                <template #default="scope">
+                  <el-button size="small" @click="deactivateLicense(scope.row.id)" v-if="scope.row.is_active">
+                    停用
+                  </el-button>
+                  <el-button size="small" type="danger" @click="deleteLicense(scope.row.id)">
+                    删除
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
           <!-- 分页组件 -->
           <div class="pagination-container">
             <el-pagination
@@ -369,7 +371,7 @@ h1 {
 .content-row {
   display: flex;
   gap: 24px;
-  align-items: flex-start;
+  align-items: stretch; /* 改为stretch使子元素高度一致 */
 }
 
 .license-chart-small {
@@ -380,6 +382,8 @@ h1 {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   width: 350px;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .license-chart-small:hover {
@@ -407,6 +411,24 @@ h1 {
   padding: 24px;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.table-container {
+  flex: 1; /* 表格容器填充剩余空间 */
+  overflow: auto; /* 添加滚动条以防内容过多 */
+}
+
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  flex-shrink: 0; /* 防止分页组件被压缩 */
 }
 
 .table-header {
@@ -422,16 +444,6 @@ h1 {
   font-weight: 600;
 }
 
-.pagination-container {
-  margin-top: 20px;
-  display: flex;
-  justify-content: center;
-  padding: 20px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-}
-
 .license-table:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
@@ -439,7 +451,8 @@ h1 {
 
 #licenseChart {
   width: 100%;
-  height: 300px; /* 适应小模块的高度 */
+  flex: 1; /* 使图表填充剩余空间 */
+  min-height: 300px; /* 设置最小高度 */
 }
 
 /* 响应式设计 */
