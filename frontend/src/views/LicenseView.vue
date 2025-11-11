@@ -24,7 +24,11 @@
           </div>
           <div class="table-container">
             <el-table :data="licenseList" style="width: 100%" table-layout="fixed">
-              <el-table-column prop="id" label="ID" width="80" />
+              <el-table-column label="序号" width="80">
+                <template #default="scope">
+                  {{ (currentPage - 1) * pageSize + scope.$index + 1 }}
+                </template>
+              </el-table-column>
               <el-table-column prop="customer" label="客户名称" min-width="120" />
               <el-table-column prop="fingerprint" label="机器码" min-width="150" />
               <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
@@ -47,8 +51,8 @@
               </el-table-column>
               <el-table-column label="操作" width="150">
                 <template #default="scope">
-                  <el-button size="small" @click="deactivateLicense(scope.row.id)" v-if="scope.row.is_active">
-                    停用
+                  <el-button size="small" type="primary" @click="downloadLicense(scope.row.id)">
+                    下载
                   </el-button>
                   <el-button size="small" type="danger" @click="deleteLicense(scope.row.id)">
                     删除
@@ -433,6 +437,34 @@ const deleteLicense = async (id) => {
     if (error !== 'cancel') {
       ElMessage.error('删除License时出错: ' + (error.response?.data?.error || error.message))
     }
+  }
+}
+
+// 下载License
+const downloadLicense = async (id) => {
+  try {
+    // 调用后端API获取License内容
+    const response = await axios.get(`${API_BASE_URL}/license/activations/${id}/download`)
+    
+    if (response.data.success) {
+      // 创建下载链接
+      const blob = new Blob([response.data.licenseContent], { type: 'text/plain' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'license.lic'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      ElMessage.success('License下载成功')
+    } else {
+      ElMessage.error('License下载失败')
+    }
+  } catch (error) {
+    console.error('下载License失败:', error)
+    ElMessage.error('下载License时出错: ' + (error.response?.data?.error || error.message))
   }
 }
 

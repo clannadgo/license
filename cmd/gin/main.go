@@ -168,6 +168,34 @@ func main() {
 				"message": "License deactivated successfully",
 			})
 		})
+
+		// 下载许可证文件
+		api.GET("/license/activations/:id/download", func(c *gin.Context) {
+			idStr := c.Param("id")
+			id, err := strconv.Atoi(idStr)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid license id"})
+				return
+			}
+
+			// 获取许可证激活记录
+			activation, err := db.GetLicenseActivationByID(int64(id))
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get license activation"})
+				return
+			}
+
+			if activation == nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "license activation not found"})
+				return
+			}
+
+			// 返回许可证内容
+			c.JSON(http.StatusOK, gin.H{
+				"success": true,
+				"licenseContent": activation.License,
+			})
+		})
 	}
 
 	// 应用许可证中间件到所有路由（除了健康检查和API路由组）
