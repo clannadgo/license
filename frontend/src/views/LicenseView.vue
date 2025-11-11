@@ -327,11 +327,20 @@ const deactivateLicense = async (id) => {
       type: 'warning'
     })
     
-    // 这里需要根据后端API实现停用功能
-    // 目前后端可能没有提供停用特定License的API
-    ElMessage.info('停用功能需要后端API支持')
+    // 调用后端API停用License
+    const response = await axios.put(`${API_BASE_URL}/license/activations/${id}/deactivate`)
+    
+    if (response.data.success) {
+      ElMessage.success('License停用成功')
+      // 刷新列表
+      fetchLicenseList(currentPage.value, pageSize.value)
+    } else {
+      ElMessage.error('License停用失败')
+    }
   } catch (error) {
-    // 用户取消操作
+    if (error !== 'cancel') {
+      ElMessage.error('停用License时出错: ' + (error.response?.data?.error || error.message))
+    }
   }
 }
 
@@ -344,11 +353,20 @@ const deleteLicense = async (id) => {
       type: 'warning'
     })
     
-    // 这里需要根据后端API实现删除功能
-    // 目前后端可能没有提供删除特定License的API
-    ElMessage.info('删除功能需要后端API支持')
+    // 调用后端API删除License
+    const response = await axios.delete(`${API_BASE_URL}/license/activations/${id}`)
+    
+    if (response.data.success) {
+      ElMessage.success('License删除成功')
+      // 刷新列表
+      fetchLicenseList(currentPage.value, pageSize.value)
+    } else {
+      ElMessage.error('License删除失败')
+    }
   } catch (error) {
-    // 用户取消操作
+    if (error !== 'cancel') {
+      ElMessage.error('删除License时出错: ' + (error.response?.data?.error || error.message))
+    }
   }
 }
 

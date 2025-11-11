@@ -114,6 +114,48 @@ func main() {
 				"expired": expired,
 			})
 		})
+
+		// 删除许可证激活记录
+		api.DELETE("/license/activations/:id", func(c *gin.Context) {
+			idStr := c.Param("id")
+			id, err := strconv.Atoi(idStr)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid license id"})
+				return
+			}
+
+			err = db.DeleteLicenseActivation(id)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{
+				"success": true,
+				"message": "License deleted successfully",
+			})
+		})
+
+		// 停用许可证激活记录
+		api.PUT("/license/activations/:id/deactivate", func(c *gin.Context) {
+			idStr := c.Param("id")
+			id, err := strconv.Atoi(idStr)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid license id"})
+				return
+			}
+
+			err = db.DeactivateLicense(id)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{
+				"success": true,
+				"message": "License deactivated successfully",
+			})
+		})
 	}
 
 	// 应用许可证中间件到所有路由（除了健康检查和API路由组）

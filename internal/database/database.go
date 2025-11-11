@@ -422,3 +422,24 @@ func (db *DB) CleanupExpiredLicenses() error {
 
 	return nil
 }
+
+// DeleteLicenseActivation 删除许可证激活记录
+func (db *DB) DeleteLicenseActivation(id int) error {
+	query := `DELETE FROM license_activations WHERE id = ?`
+
+	result, err := db.conn.Exec(query, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete license activation: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %v", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no license activation found with id %d", id)
+	}
+
+	return nil
+}
