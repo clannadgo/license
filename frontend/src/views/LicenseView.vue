@@ -83,12 +83,19 @@
           <el-input v-model="newLicense.customer" placeholder="请输入客户名称" />
         </el-form-item>
         <el-form-item label="硬件指纹" required>
-          <el-input v-model="newLicense.fingerprint" placeholder="请输入硬件指纹" @blur="showFingerprintValidation = true" />
-          <div v-if="newLicense.fingerprint && showFingerprintValidation" class="fingerprint-format" :class="{ 'format-valid': validateFingerprintFormat(newLicense.fingerprint), 'format-invalid': !validateFingerprintFormat(newLicense.fingerprint) }">
-            <el-icon v-if="validateFingerprintFormat(newLicense.fingerprint)" style="color: #67C23A; margin-right: 5px;"><Check /></el-icon>
-            <el-icon v-else style="color: #F56C6C; margin-right: 5px;"><Close /></el-icon>
-            格式校验：{{ validateFingerprintFormat(newLicense.fingerprint) ? '正确' : '不正确' }}
-          </div>
+          <el-tooltip
+            v-model="showFingerprintTooltip"
+            :content="fingerprintTooltipContent"
+            placement="top"
+            :disabled="!showFingerprintTooltip"
+          >
+            <el-input 
+              v-model="newLicense.fingerprint" 
+              placeholder="请输入硬件指纹" 
+              @blur="handleFingerprintBlur"
+              :class="{ 'fingerprint-invalid': showFingerprintValidation && newLicense.fingerprint && !validateFingerprintFormat(newLicense.fingerprint) }"
+            />
+          </el-tooltip>
           <div style="color: #909399; font-size: 12px; margin-top: 5px;">
             正确格式应为XXXX-XXXX-XXXX-XXXX（4组4位字母或数字）
           </div>
@@ -130,7 +137,7 @@
       </el-form>
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="showAddDialog = false; showFingerprintValidation = false">取消</el-button>
+          <el-button @click="showAddDialog = false; showFingerprintValidation = false; showFingerprintTooltip = false">取消</el-button>
           <el-button type="primary" @click="addLicense">确定</el-button>
         </span>
       </template>
@@ -183,6 +190,8 @@ const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(10)
 const showFingerprintValidation = ref(false)
+const showFingerprintTooltip = ref(false)
+const fingerprintTooltipContent = ref('')
 
 const newLicense = ref({
   customer: '',
@@ -317,7 +326,9 @@ const addLicense = async () => {
     // 验证指纹格式
     if (!validateFingerprintFormat(newLicense.value.fingerprint)) {
       showFingerprintValidation.value = true // 确保显示格式校验提示
-      ElMessage.error('硬件指纹格式不正确，请按照下方提示的格式输入')
+      showFingerprintTooltip.value = true // 显示tooltip
+      fingerprintTooltipContent.value = '硬件指纹格式不正确，应为XXXX-XXXX-XXXX-XXXX格式（4组4位字母或数字）'
+      ElMessage.error('硬件指纹格式不正确，请按照提示修改')
       return
     }
     
@@ -346,6 +357,7 @@ const addLicense = async () => {
       ElMessage.success('License添加成功')
       showAddDialog.value = false
       showFingerprintValidation.value = false // 重置指纹格式校验提示状态
+      showFingerprintTooltip.value = false // 重置tooltip状态
       // 重置表单
       newLicense.value = {
         customer: '',
@@ -430,6 +442,22 @@ const validateFingerprintFormat = (fingerprint) => {
   // 指纹格式应为：XXXX-XXXX-XXXX-XXXX，其中X为字母或数字
   const pattern = /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i
   return pattern.test(fingerprint)
+}
+
+// 处理指纹输入框失去焦点事件
+const handleFingerprintBlur = () => {
+  showFingerprintValidation.value = true
+  
+  if (newLicense.value.fingerprint) {
+    if (!validateFingerprintFormat(newLicense.value.fingerprint)) {
+      showFingerprintTooltip.value = true
+      fingerprintTooltipContent.value = '硬件指纹格式不正确，应为XXXX-XXXX-XXXX-XXXX格式（4组4位字母或数字）'
+    } else {
+      showFingerprintTooltip.value = false
+    }
+  } else {
+    showFingerprintTooltip.value = false
+  }
 }
 
 // 生成指纹
@@ -672,6 +700,27 @@ h1 {
   width: 100%;
   flex: 1; /* 使图表填充剩余空间 */
   min-height: 300px; /* 设置最小高度 */
+}
+
+/* 指纹输入框校验不正确时的样式 */
+.fingerprint-invalid .el-input__wrapper {
+  border-color: var(--el-color-danger) !important;
+  box-shadow: 0 0 0 1px var(--el-color-danger) inset;
+}
+
+.fingerprint-invalid .el-input__wrapper:hover {
+  border-color: var(--el-color-danger) !important;
+}
+
+.fingerprint-invalid .el-input__wrapper.is-focus {
+  border-color: var(--el-color-danger) !important;
+  box-shadow: 0 0 0 1px var(--el-color-danger) inset;
+}
+
+/* 确保tooltip样式正确 */
+.el-popper.is-dark {
+  background-color: var(--el-color-danger) !important;
+  color: #fff !important;
 }
 
 /* 响应式设计 */
