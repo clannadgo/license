@@ -183,7 +183,7 @@ func ActivateHandler(pubKeyPath, privateKeyPath string, db *database.DB) gin.Han
 
 		// 获取本机激活码并转 hex
 		fpCode := hwid.GetFingerprint() // XXXX-XXXX-XXXX-XXXX
-		localHex, err := DecodeActivationCodeToHex(fpCode)
+		_, err := DecodeActivationCodeToHex(fpCode)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to decode local fingerprint"})
 			return
@@ -232,18 +232,15 @@ func ActivateHandler(pubKeyPath, privateKeyPath string, db *database.DB) gin.Han
 			return
 		}
 
-		// fingerprint check
-		if cl.Fingerprint != "" && cl.Fingerprint != localHex {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "fingerprint mismatch"})
-			return
-		}
+		// 不需要验证指纹匹配，因为我们使用前端传入的指纹
+		// 这允许为任何机器生成许可证，而不仅限于当前机器
 
 		// license已通过数据库存储，不需要写入文件系统
 
 		// 记录激活信息到数据库
 		if db != nil {
 			// 检查是否已有该指纹的激活记录
-			existingActivation, err := db.GetLicenseActivationByFingerprint(localHex)
+			existingActivation, err := db.GetLicenseActivationByFingerprint(fp)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "database error"})
 				return
@@ -258,7 +255,7 @@ func ActivateHandler(pubKeyPath, privateKeyPath string, db *database.DB) gin.Han
 			// 创建新的激活记录
 			activation := &database.LicenseActivation{
 				Customer:    cl.Customer,
-				Fingerprint: localHex,
+				Fingerprint: fp, // 使用前端传入的指纹
 				License:     req.License,
 				Description: req.Description,
 				IssuedAt:    time.Unix(cl.Iat, 0),
