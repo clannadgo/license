@@ -350,7 +350,8 @@ const fetchLicenseList = async (page = 1, size = 10, keyword = '') => {
     // 处理后端返回的数据
     // 假设后端可能支持分页或不分页的两种情况
     if (response.data.activations) {
-      licenseList.value = response.data.activations || []
+      // 确保始终是数组
+      licenseList.value = Array.isArray(response.data.activations) ? response.data.activations : []
       // 如果后端支持分页，会返回总数
       if (response.data.total !== undefined) {
         total.value = response.data.total
@@ -359,7 +360,7 @@ const fetchLicenseList = async (page = 1, size = 10, keyword = '') => {
       }
     } else {
       // 兼容不分页的情况
-      licenseList.value = response.data || []
+      licenseList.value = Array.isArray(response.data) ? response.data : []
       total.value = licenseList.value.length
     }
     
