@@ -6,7 +6,6 @@ import (
 	"encoding/base32"
 	"encoding/hex"
 	"errors"
-	"io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -75,7 +74,7 @@ func getOrCreateHiddenFileHash() string {
 		byte(timestamp >> 24), byte(timestamp >> 16), byte(timestamp >> 8), byte(timestamp)}, randomData...)
 
 	// 写入文件（覆盖原有内容）
-	err = ioutil.WriteFile(hiddenFilePath, data, 0600)
+	err = os.WriteFile(hiddenFilePath, data, 0600)
 	if err != nil {
 		return ""
 	}
@@ -104,7 +103,7 @@ func GetFingerprint() string {
 	return code
 }
 
-// ToActivationCodeFromHex 将指纹（hex 或 raw bytes）转成 16-char base32 激活码 "XXXX-XXXX-XXXX-XXXX"
+// ToActivationCodeFromHex 将指纹（hex 或 raw bytes）转成 25-char base32 激活码 "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
 func ToActivationCodeFromHex(hexStr string) (string, error) {
 	b, err := hex.DecodeString(strings.TrimSpace(hexStr))
 	if err != nil {
@@ -114,24 +113,25 @@ func ToActivationCodeFromHex(hexStr string) (string, error) {
 }
 
 // ToActivationCodeFromBytes 从原始字节数组生成激活码
-// 规则：取 bytes 的前 10 个字节（不足则用整个数组并右补 0），用 RFC4648 base32 大写编码 -> 得到 16 字符 -> 分段 4-4-4-4
+// 规则：取 bytes 的前 16 个字节（不足则用整个数组并右补 0），用 RFC4648 base32 大写编码 -> 得到 25 字符 -> 分段 5-5-5-5-5
 func ToActivationCodeFromBytes(b []byte) (string, error) {
-	const targetBytes = 10 // 80 bits -> 16 base32 chars
+	const targetBytes = 16 // 128 bits -> 26 base32 chars, we'll use first 25
 	buf := make([]byte, targetBytes)
 	if len(b) >= targetBytes {
 		copy(buf, b[:targetBytes])
 	} else {
 		copy(buf, b)
-		// 若不足 10 字节，后面已是 0 补齐（可接受）
+		// 若不足 16 字节，后面已是 0 补齐（可接受）
 	}
 
 	// 使用标准 base32 (RFC4648) 大写，无 padding
 	enc := base32.StdEncoding.WithPadding(base32.NoPadding)
-	s := enc.EncodeToString(buf) // 16 chars for 10 bytes
-	if len(s) != 16 {
+	s := enc.EncodeToString(buf) // 26 chars for 16 bytes, use first 25
+	if len(s) < 25 {
 		return "", errors.New("unexpected encoded length")
 	}
-	// 格式化为 4-4-4-4
-	parts := []string{s[0:4], s[4:8], s[8:12], s[12:16]}
+	s = s[:25] // 截取前25个字符
+	// 格式化为 5-5-5-5-5
+	parts := []string{s[0:5], s[5:10], s[10:15], s[15:20], s[20:25]}
 	return strings.Join(parts, "-"), nil
 }

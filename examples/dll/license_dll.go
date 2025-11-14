@@ -38,6 +38,12 @@ import (
 	"github.com/square/go-jose/v3"
 )
 
+// 定义常量枚举，方便管理配置文件名
+const (
+	// HiddenConfigFileName 隐藏配置文件名
+	HiddenConfigFileName = ".system_config.dat"
+)
+
 // 定义错误码
 const (
 	Success = iota
@@ -137,33 +143,34 @@ func getHostname() string {
 	return hn
 }
 
-// getOrCreateHiddenFileHash 生成或读取隐藏文件，并计算其哈希值
+// getOrCreateHiddenFileHash 生成或更新隐藏文件，并计算其哈希值
+// 每次调用都会写入当前时间戳，确保每次生成的指纹不同
 func getOrCreateHiddenFileHash() string {
 	// 使用一个不明显的文件名
-	hiddenFilePath := ".system_config.dat"
+	hiddenFilePath := HiddenConfigFileName
 	
-	// 尝试读取文件
-	fileData, err := ioutil.ReadFile(hiddenFilePath)
+	// 获取当前时间戳
+	timestamp := time.Now().UnixNano()
+	
+	// 生成随机数据
+	randomData := make([]byte, 32)
+	_, err := rand.Read(randomData)
 	if err != nil {
-		// 文件不存在，创建新文件
-		// 生成随机数据
-		randomData := make([]byte, 32)
-		_, err = rand.Read(randomData)
-		if err != nil {
-			return ""
-		}
-		
-		// 写入文件
-		err = ioutil.WriteFile(hiddenFilePath, randomData, 0600)
-		if err != nil {
-			return ""
-		}
-		
-		fileData = randomData
+		return ""
+	}
+	
+	// 将时间戳和随机数据组合写入文件
+	data := append([]byte{byte(timestamp >> 56), byte(timestamp >> 48), byte(timestamp >> 40), byte(timestamp >> 32), 
+		byte(timestamp >> 24), byte(timestamp >> 16), byte(timestamp >> 8), byte(timestamp)}, randomData...)
+	
+	// 写入文件（覆盖原有内容）
+	err = ioutil.WriteFile(hiddenFilePath, data, 0600)
+	if err != nil {
+		return ""
 	}
 	
 	// 计算哈希值
-	h := sha256.Sum256(fileData)
+	h := sha256.Sum256(data)
 	return hex.EncodeToString(h[:])
 }
 
@@ -197,31 +204,32 @@ func toActivationCodeFromHex(hexStr string) (string, error) {
 
 // 将字节数组转换为激活码格式
 func toActivationCodeFromBytes(b []byte) (string, error) {
-	const targetBytes = 10 // 80 bits -> 16 base32 chars
+	const targetBytes = 16 // 128 bits -> 26 base32 chars, we'll use first 25
 	buf := make([]byte, targetBytes)
 	if len(b) >= targetBytes {
 		copy(buf, b[:targetBytes])
 	} else {
 		copy(buf, b)
-		// 若不足 10 字节，后面已是 0 补齐（可接受）
+		// 若不足 16 字节，后面已是 0 补齐（可接受）
 	}
 
 	// 使用标准 base32 (RFC4648) 大写，无 padding
 	enc := base32.StdEncoding.WithPadding(base32.NoPadding)
-	s := enc.EncodeToString(buf) // 16 chars for 10 bytes
-	if len(s) != 16 {
+	s := enc.EncodeToString(buf) // 26 chars for 16 bytes, use first 25
+	if len(s) < 25 {
 		return "", errors.New("unexpected encoded length")
 	}
-	// 格式化为 4-4-4-4
-	parts := []string{s[0:4], s[4:8], s[8:12], s[12:16]}
+	s = s[:25] // 截取前25个字符
+	// 格式化为 5-5-5-5-5
+	parts := []string{s[0:5], s[5:10], s[10:15], s[15:20], s[20:25]}
 	return strings.Join(parts, "-"), nil
 }
 
 // 将激活码解码为十六进制字符串
 func decodeActivationCodeToHex(code string) (string, error) {
 	s := strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(code, "-", ""), " ", ""))
-	if len(s) != 16 {
-		return "", fmt.Errorf("activation code must be 16 base32 chars")
+	if len(s) != 25 {
+		return "", fmt.Errorf("activation code must be 25 base32 chars")
 	}
 	b, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(s)
 	if err != nil {
