@@ -263,7 +263,7 @@ func ActivateHandler(pubKeyPath, privateKeyPath string, db *database.DB) gin.Han
 		).Unix()
 
 		// 生成新的license
-		newLicense, err := generateLicense(pubKeyPath, privateKeyPath, req.Customer, fpForLicense, now, exp)
+		newLicense, err := generateLicense(pubKeyPath, privateKeyPath, req.Customer, fpForLicense, activatedAt, exp)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate license: " + err.Error()})
 			return
