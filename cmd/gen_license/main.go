@@ -55,18 +55,17 @@ func loadPrivateKey(path string) (*rsa.PrivateKey, error) {
 	return nil, fmt.Errorf("unsupported private key format")
 }
 
-// decodeFingerprintToHex 支持把 "XXXX-XXXX-XXXX-XXXX" (base32) -> hex string
-// 当输入看起来像带 '-' 的机器码时调用
-func decodeFingerprintToHex(code string) (string, error) {
+// decodeActivationCode 解码激活码为十六进制
+func decodeActivationCode(code string) (string, error) {
+	// 首先修剪所有空白字符（包括换行符）
+	code = strings.TrimSpace(code)
 	// remove dashes and spaces, uppercase
 	s := strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(code, "-", ""), " ", ""))
-	if len(s) != 16 {
-		return "", fmt.Errorf("activation code must be 16 base32 chars (4-4-4-4)")
+	if len(s) != 25 {
+		return "", fmt.Errorf("activation code must be 25 base32 chars (5-5-5-5-5)")
 	}
 	// base32 decode, RFC4648, no padding
-	dec := base32.StdEncoding.WithPadding(base32.NoPadding)
-	// we expect 10 bytes
-	b, err := dec.DecodeString(s)
+	b, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(s)
 	if err != nil {
 		return "", err
 	}
@@ -101,9 +100,9 @@ func main() {
 	// if fingerprint looks like activation code (contains '-'), decode it to hex
 	fp := param.fingerprint
 	if strings.Contains(param.fingerprint, "-") {
-		h, err := decodeActivationCodeToHex(param.fingerprint)
+		h, err := decodeActivationCode(param.fingerprint)
 		if err != nil {
-			fmt.Println(os.Stderr, "failed to decode activation code: %v\n", err)
+			fmt.Fprintf(os.Stderr, "failed to decode activation code: %v\n", err)
 			os.Exit(3)
 		}
 		fp = h
