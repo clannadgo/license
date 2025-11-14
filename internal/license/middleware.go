@@ -253,8 +253,9 @@ func ActivateHandler(pubKeyPath, privateKeyPath string, db *database.DB) gin.Han
 		}
 
 		// 计算过期时间
-		now := time.Now().UTC()
-		exp := now.Add(
+		// 使用当前时间作为激活时间，并在此基础上加上有效期
+		activatedAt := time.Now().UTC()
+		exp := activatedAt.Add(
 			time.Duration(req.ValidityDays)*24*time.Hour +
 				time.Duration(req.ValidityHours)*time.Hour +
 				time.Duration(req.ValidityMinutes)*time.Minute +
@@ -305,7 +306,7 @@ func ActivateHandler(pubKeyPath, privateKeyPath string, db *database.DB) gin.Han
 				Description: req.Description,
 				IssuedAt:    time.Unix(cl.Iat, 0),
 				ExpiresAt:   time.Unix(cl.Exp, 0),
-				ActivatedAt: time.Now(),
+				ActivatedAt: activatedAt, // 使用相同的激活时间变量，确保一致性
 				IsActive:    true,
 			}
 
