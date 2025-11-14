@@ -10,11 +10,18 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
+)
+
+// 定义常量枚举，方便管理配置文件名
+const (
+	// HiddenConfigFileName 隐藏配置文件名
+	HiddenConfigFileName = ".system_config.dat"
 )
 
 // getMachineID 读取 Linux /etc/machine-id
 func getMachineID() string {
-	if b, err := ioutil.ReadFile("/etc/machine-id"); err == nil {
+	if b, err := os.ReadFile("/etc/machine-id"); err == nil {
 		return strings.TrimSpace(string(b))
 	}
 	return ""
@@ -47,33 +54,34 @@ func getHostname() string {
 	return hn
 }
 
-// getOrCreateHiddenFileHash 生成或读取隐藏文件，并计算其哈希值
+// getOrCreateHiddenFileHash 生成或更新隐藏文件，并计算其哈希值
+// 每次调用都会写入当前时间戳，确保每次生成的指纹不同
 func getOrCreateHiddenFileHash() string {
 	// 使用一个不明显的文件名
-	hiddenFilePath := ".system_config.dat"
-	
-	// 尝试读取文件
-	fileData, err := ioutil.ReadFile(hiddenFilePath)
+	hiddenFilePath := HiddenConfigFileName
+
+	// 获取当前时间戳
+	timestamp := time.Now().UnixNano()
+
+	// 生成随机数据
+	randomData := make([]byte, 32)
+	_, err := rand.Read(randomData)
 	if err != nil {
-		// 文件不存在，创建新文件
-		// 生成随机数据
-		randomData := make([]byte, 32)
-		_, err = rand.Read(randomData)
-		if err != nil {
-			return ""
-		}
-		
-		// 写入文件
-		err = ioutil.WriteFile(hiddenFilePath, randomData, 0600)
-		if err != nil {
-			return ""
-		}
-		
-		fileData = randomData
+		return ""
 	}
-	
+
+	// 将时间戳和随机数据组合写入文件
+	data := append([]byte{byte(timestamp >> 56), byte(timestamp >> 48), byte(timestamp >> 40), byte(timestamp >> 32),
+		byte(timestamp >> 24), byte(timestamp >> 16), byte(timestamp >> 8), byte(timestamp)}, randomData...)
+
+	// 写入文件（覆盖原有内容）
+	err = ioutil.WriteFile(hiddenFilePath, data, 0600)
+	if err != nil {
+		return ""
+	}
+
 	// 计算哈希值
-	h := sha256.Sum256(fileData)
+	h := sha256.Sum256(data)
 	return hex.EncodeToString(h[:])
 }
 
