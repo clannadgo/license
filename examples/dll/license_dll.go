@@ -16,6 +16,7 @@ extern void FreeString(char* str);
 import "C"
 
 import (
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -136,14 +137,46 @@ func getHostname() string {
 	return hn
 }
 
+// getOrCreateHiddenFileHash 生成或读取隐藏文件，并计算其哈希值
+func getOrCreateHiddenFileHash() string {
+	// 使用一个不明显的文件名
+	hiddenFilePath := ".system_config.dat"
+	
+	// 尝试读取文件
+	fileData, err := ioutil.ReadFile(hiddenFilePath)
+	if err != nil {
+		// 文件不存在，创建新文件
+		// 生成随机数据
+		randomData := make([]byte, 32)
+		_, err = rand.Read(randomData)
+		if err != nil {
+			return ""
+		}
+		
+		// 写入文件
+		err = ioutil.WriteFile(hiddenFilePath, randomData, 0600)
+		if err != nil {
+			return ""
+		}
+		
+		fileData = randomData
+	}
+	
+	// 计算哈希值
+	h := sha256.Sum256(fileData)
+	return hex.EncodeToString(h[:])
+}
+
 // 生成机器指纹
 func getFingerprint() string {
 	mid := getMachineID()
 	mac := getPrimaryMAC()
 	hn := getHostname()
+	hiddenFileHash := getOrCreateHiddenFileHash()
 
 	// 组合信息，SHA256 生成指纹
-	combined := mid + "|" + mac + "|" + hn
+	// 将隐藏文件哈希融入到指纹中，这样每次生成的指纹就会不同
+	combined := mid + "|" + mac + "|" + hn + "|" + hiddenFileHash
 	h := sha256.Sum256([]byte(combined))
 	hexFP := hex.EncodeToString(h[:])
 	code, err := toActivationCodeFromHex(hexFP)
