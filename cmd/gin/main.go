@@ -246,8 +246,18 @@ func main() {
 	r.Use(license.LicenseMiddleware(pubKeyPath, storePath, db))
 
 	// 启动服务器
-	log.Println("Starting license service on :8080")
-	if err := r.Run(":8080"); err != nil {
+	port := "8080"
+	// 尝试从环境变量获取端口
+	if envPort := os.Getenv("PORT"); envPort != "" {
+		port = envPort
+	}
+	// 尝试从命令行参数获取端口
+	if len(os.Args) > 1 {
+		port = os.Args[1]
+	}
+
+	log.Printf("Starting license service on :%s", port)
+	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }

@@ -196,6 +196,46 @@ func ActivateHandler(pubKeyPath, privateKeyPath string, db *database.DB) gin.Han
 			return
 		}
 
+		// 校验激活码格式为XXXX-XXXX-XXXX-XXXX
+		if strings.Contains(req.Fingerprint, "-") {
+			// 验证格式是否为XXXX-XXXX-XXXX-XXXX
+			parts := strings.Split(req.Fingerprint, "-")
+			if len(parts) != 4 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "激活码格式不正确，应为XXXX-XXXX-XXXX-XXXX"})
+				return
+			}
+
+			// 验证每个部分是否为4个字符
+			for _, part := range parts {
+				if len(part) != 4 {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "激活码格式不正确，每个部分应为4个字符"})
+					return
+				}
+
+				// 验证每个字符是否为有效的base32字符（A-Z和2-7）
+				for _, char := range part {
+					if !((char >= 'A' && char <= 'Z') || (char >= '2' && char <= '7')) {
+						c.JSON(http.StatusBadRequest, gin.H{"error": "激活码包含无效字符，只允许A-Z和2-7"})
+						return
+					}
+				}
+			}
+		} else {
+			// 如果没有连字符，验证是否为16个字符的base32编码
+			if len(req.Fingerprint) != 16 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "激活码长度不正确，应为16个字符"})
+				return
+			}
+
+			// 验证每个字符是否为有效的base32字符
+			for _, char := range req.Fingerprint {
+				if !((char >= 'A' && char <= 'Z') || (char >= '2' && char <= '7')) {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "激活码包含无效字符，只允许A-Z和2-7"})
+					return
+				}
+			}
+		}
+
 		// 使用前端传入的原始fingerprint，不进行任何转换
 		fp := req.Fingerprint
 
