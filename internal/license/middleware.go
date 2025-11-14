@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -83,11 +84,11 @@ func verifyJWS(pub *rsa.PublicKey, jwsCompact string) (*claims, error) {
 
 // ------------------ HWID helper ------------------
 
-// DecodeActivationCodeToHex 将 "XXXX-XXXX-XXXX-XXXX" -> hex string
+// DecodeActivationCodeToHex 将 "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" -> hex string
 func DecodeActivationCodeToHex(code string) (string, error) {
 	s := strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(code, "-", ""), " ", ""))
-	if len(s) != 16 {
-		return "", fmt.Errorf("activation code must be 16 base32 chars")
+	if len(s) != 25 {
+		return "", fmt.Errorf("activation code must be 25 base32 chars")
 	}
 	b, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(s)
 	if err != nil {
@@ -196,29 +197,13 @@ func ActivateHandler(pubKeyPath, privateKeyPath string, db *database.DB) gin.Han
 			return
 		}
 
-		// 校验激活码格式为XXXX-XXXX-XXXX-XXXX
+		// 检查是否包含连字符
 		if strings.Contains(req.Fingerprint, "-") {
-			// 验证格式是否为XXXX-XXXX-XXXX-XXXX
-			parts := strings.Split(req.Fingerprint, "-")
-			if len(parts) != 4 {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "激活码格式不正确，应为XXXX-XXXX-XXXX-XXXX"})
+			// 使用正则表达式校验激活码格式（XXXXX-XXXXX-XXXXX-XXXXX-XXXXX）
+			matched, _ := regexp.MatchString(`^[A-Z2-7]{5}-[A-Z2-7]{5}-[A-Z2-7]{5}-[A-Z2-7]{5}-[A-Z2-7]{5}$`, req.Fingerprint)
+			if !matched {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "激活码格式不正确，应为XXXXX-XXXXX-XXXXX-XXXXX-XXXXX，仅允许A-Z和2-7字符"})
 				return
-			}
-
-			// 验证每个部分是否为4个字符
-			for _, part := range parts {
-				if len(part) != 4 {
-					c.JSON(http.StatusBadRequest, gin.H{"error": "激活码格式不正确，每个部分应为4个字符"})
-					return
-				}
-
-				// 验证每个字符是否为有效的base32字符（A-Z和2-7）
-				for _, char := range part {
-					if !((char >= 'A' && char <= 'Z') || (char >= '2' && char <= '7')) {
-						c.JSON(http.StatusBadRequest, gin.H{"error": "激活码包含无效字符，只允许A-Z和2-7"})
-						return
-					}
-				}
 			}
 		} else {
 			// 如果没有连字符，验证是否为16个字符的base32编码
