@@ -254,7 +254,7 @@ func ActivateHandler(pubKeyPath, privateKeyPath string, db *database.DB) gin.Han
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		fmt.Println(fmt.Sprintf("Customer: %s, Fingerprint: %s, License: %s", cl.Customer, fp, req.License))
+		fmt.Println(fmt.Sprintf("Customer: %s, Fingerprint: %s, License: %s", cl.Customer, cl.Fingerprint, req.License))
 		// 记录激活信息到数据库
 		if db != nil {
 			// 检查是否已有该指纹的激活记录

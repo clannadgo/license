@@ -1,9 +1,9 @@
-package main
+package examples
 
 import (
 	"fmt"
+
 	"github.com/gin-gonic/gin"
-	"license/examples"
 )
 
 func main() {
@@ -15,7 +15,7 @@ func main() {
 	// router.Use(examples.LicenseMiddleware("", ""))
 
 	// 方式2: 自定义文件路径
-	router.Use(examples.LicenseMiddleware("./config/public.pem", "./config/license.lic"))
+	router.Use(LicenseMiddleware("./config/public.pem", "./config/license.lic"))
 
 	// 只对特定路由组应用许可证验证
 	api := router.Group("/api")
