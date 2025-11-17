@@ -99,7 +99,7 @@ func DecodeActivationCodeToHex(code string) (string, error) {
 
 // ------------------ License Generation ------------------
 
-func generateLicense(pubKeyPath, privateKeyPath, customer, fingerprint string, issuedAt time.Time, exp int64) (string, error) {
+func generateLicense(privateKeyPath, customer, fingerprint string, issuedAt time.Time, exp int64) (string, error) {
 	// Load private key (assuming it's in the same directory as public key with .key extension)
 	b, err := os.ReadFile(privateKeyPath)
 	if err != nil {
@@ -182,14 +182,6 @@ func ActivateHandler(pubKeyPath, privateKeyPath string, db *database.DB) gin.Han
 			return
 		}
 
-		// 获取本机激活码并转 hex
-		fpCode := hwid.GetFingerprint() // XXXX-XXXX-XXXX-XXXX
-		_, err := DecodeActivationCodeToHex(fpCode)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to decode local fingerprint"})
-			return
-		}
-
 		// 验证至少有一个时间单位被设置
 		if req.ValidityDays == 0 && req.ValidityHours == 0 &&
 			req.ValidityMinutes == 0 && req.ValiditySeconds == 0 {
@@ -248,7 +240,7 @@ func ActivateHandler(pubKeyPath, privateKeyPath string, db *database.DB) gin.Han
 		).Unix()
 
 		// 生成新的license
-		newLicense, err := generateLicense(pubKeyPath, privateKeyPath, req.Customer, fpForLicense, activatedAt, exp)
+		newLicense, err := generateLicense(privateKeyPath, req.Customer, fpForLicense, activatedAt, exp)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate license: " + err.Error()})
 			return
@@ -262,12 +254,7 @@ func ActivateHandler(pubKeyPath, privateKeyPath string, db *database.DB) gin.Han
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-
-		// 不需要验证指纹匹配，因为我们使用前端传入的指纹
-		// 这允许为任何机器生成许可证，而不仅限于当前机器
-
-		// license已通过数据库存储，不需要写入文件系统
-
+		fmt.Println(fmt.Sprintf("Customer: %s, Fingerprint: %s, License: %s", cl.Customer, fp, req.License))
 		// 记录激活信息到数据库
 		if db != nil {
 			// 检查是否已有该指纹的激活记录
@@ -308,7 +295,7 @@ func ActivateHandler(pubKeyPath, privateKeyPath string, db *database.DB) gin.Han
 
 // ------------------ License Middleware ------------------
 
-func LicenseMiddleware(pubKeyPath, storePath string, db *database.DB) gin.HandlerFunc {
+func LicenseMiddleware(storePath, pubKeyPath string, db *database.DB) gin.HandlerFunc {
 	pub, err := loadPublicKey(pubKeyPath)
 	if err != nil {
 		panic(err)
