@@ -10,18 +10,21 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 	"time"
+
+	"license/internal/hwid"
 
 	"github.com/gin-gonic/gin"
 )
 
 // LicenseInfo 许可证信息结构体
 type LicenseInfo struct {
-	ActivationCode  string    `json:"activation_code"`
-	ValidFrom       time.Time `json:"valid_from"`
-	ValidUntil      time.Time `json:"valid_until"`
-	Fingerprint     string    `json:"fingerprint"`
-	Status          string    `json:"status"`
+	ActivationCode string    `json:"activation_code"`
+	ValidFrom      time.Time `json:"valid_from"`
+	ValidUntil     time.Time `json:"valid_until"`
+	Fingerprint    string    `json:"fingerprint"`
+	Status         string    `json:"status"`
 }
 
 // LicenseMiddleware 客户端许可证中间件
@@ -60,6 +63,23 @@ func LicenseMiddleware(publicKeyPath, licenseFilePath string) gin.HandlerFunc {
 			return
 		}
 
+		// 获取当前机器的指纹
+		currentFingerprint := hwid.GetFingerprint()
+
+		// 比较指纹是否匹配（忽略连字符进行比较）
+		licenseFingerprintClean := strings.ReplaceAll(licenseInfo.Fingerprint, "-", "")
+		currentFingerprintClean := strings.ReplaceAll(currentFingerprint, "-", "")
+
+		if licenseFingerprintClean != currentFingerprintClean {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error":               "许可证与当前设备不匹配",
+				"license_fingerprint": licenseInfo.Fingerprint,
+				"current_fingerprint": currentFingerprint,
+			})
+			c.Abort()
+			return
+		}
+
 		// 检查许可证是否过期
 		now := time.Now()
 		if now.Before(licenseInfo.ValidFrom) {
@@ -70,6 +90,16 @@ func LicenseMiddleware(publicKeyPath, licenseFilePath string) gin.HandlerFunc {
 
 		if now.After(licenseInfo.ValidUntil) {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "许可证已过期", "valid_until": licenseInfo.ValidUntil})
+			c.Abort()
+			return
+		}
+
+		// 检查许可证状态
+		if licenseInfo.Status != "active" {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error":  "许可证状态无效",
+				"status": licenseInfo.Status,
+			})
 			c.Abort()
 			return
 		}
@@ -116,21 +146,51 @@ func readPublicKey(path string) (*rsa.PublicKey, error) {
 
 // verifyAndDecodeLicense 验证并解码许可证
 func verifyAndDecodeLicense(licenseData []byte, publicKey *rsa.PublicKey) (*LicenseInfo, error) {
-	// 这里假设license.lic文件包含base64编码的JSON数据
-	// 在实际应用中，可能需要根据实际的许可证格式进行调整
-	
-	// 解码base64
+	// 首先尝试解码base64编码的许可证数据
 	decoded, err := base64.StdEncoding.DecodeString(string(licenseData))
 	if err != nil {
-		// 如果不是base64编码，尝试直接作为JSON解析
+		// 如果base64解码失败，可能不是base64编码，尝试直接作为JSON解析
 		decoded = licenseData
 	}
 
-	// 解析JSON
+	// 解析JSON格式的许可证信息
 	var licenseInfo LicenseInfo
 	if err := json.Unmarshal(decoded, &licenseInfo); err != nil {
 		return nil, fmt.Errorf("解析许可证内容失败: %v", err)
 	}
 
+	// 验证激活码格式（5-5-5-5-5格式）
+	if err := validateActivationCode(licenseInfo.ActivationCode); err != nil {
+		return nil, fmt.Errorf("激活码格式无效: %v", err)
+	}
+
+	// 验证指纹格式
+	if err := validateActivationCode(licenseInfo.Fingerprint); err != nil {
+		return nil, fmt.Errorf("指纹格式无效: %v", err)
+	}
+
+	// 这里可以添加签名验证逻辑，但需要根据实际的许可证签名机制实现
+	// 目前主要依赖指纹验证和时间验证
+
 	return &licenseInfo, nil
+}
+
+// validateActivationCode 验证激活码或指纹格式是否正确
+func validateActivationCode(code string) error {
+	// 去除连字符
+	code = strings.ReplaceAll(code, "-", "")
+
+	// 检查长度是否为25个字符
+	if len(code) != 25 {
+		return fmt.Errorf("长度应为25个字符")
+	}
+
+	// 检查字符是否符合base32标准（A-Z和2-7）
+	for _, char := range code {
+		if !((char >= 'A' && char <= 'Z') || (char >= '2' && char <= '7')) {
+			return fmt.Errorf("包含无效字符，只允许A-Z和2-7")
+		}
+	}
+
+	return nil
 }

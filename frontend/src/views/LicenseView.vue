@@ -121,7 +121,7 @@
             />
           </el-tooltip>
           <div style="color: #909399; font-size: 12px; margin-top: 5px;">
-            正确格式应为XXXX-XXXX-XXXX-XXXX（4组4位字母或数字）
+            正确格式应为XXXXX-XXXXX-XXXXX-XXXXX-XXXXX（5组5位字母或数字）
           </div>
         </el-form-item>
         <el-form-item label="有效期">
@@ -202,7 +202,7 @@
         <div class="fingerprint-tip">
           <el-alert
             title="提示"
-            description="此指纹基于当前机器硬件信息生成，可用于License授权。仅用于测试，生产环境请使用真实机器生成。正确格式应为XXXX-XXXX-XXXX-XXXX（4组4位字母或数字）"
+            description="此指纹基于当前机器硬件信息生成，可用于License授权。仅用于测试，生产环境请使用真实机器生成。正确格式应为XXXXX-XXXXX-XXXXX-XXXXX-XXXXX（5组5位字母或数字）"
             type="info"
             show-icon
             :closable="false"
@@ -313,8 +313,8 @@ const updateChart = () => {
         type: 'pie',
         radius: '50%',
         data: [
-          { value: activeCount, name: '激活中' },
-          { value: expiredCount, name: '已过期/停用' }
+          { value: activeCount, name: '激活中', itemStyle: { color: '#67C23A' } }, // 绿色
+          { value: expiredCount, name: '已过期/停用', itemStyle: { color: '#F56C6C' } } // 红色
         ],
         emphasis: {
           itemStyle: {
@@ -390,7 +390,7 @@ const addLicense = async () => {
     if (!validateFingerprintFormat(newLicense.value.fingerprint)) {
       showFingerprintValidation.value = true // 确保显示格式校验提示
       showFingerprintTooltip.value = true // 显示tooltip
-      fingerprintTooltipContent.value = '机器码格式不正确，应为XXXX-XXXX-XXXX-XXXX格式（4组4位字母或数字）'
+      fingerprintTooltipContent.value = '机器码格式不正确，应为XXXXX-XXXXX-XXXXX-XXXXX-XXXXX格式（5组5位字母或数字）'
       ElMessage.error('机器码格式不正确，请按照提示修改')
       return
     }
@@ -534,8 +534,8 @@ const refreshData = () => {
 
 // 指纹格式校验函数
 const validateFingerprintFormat = (fingerprint) => {
-  // 指纹格式应为：XXXX-XXXX-XXXX-XXXX，其中X为字母或数字
-  const pattern = /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i
+  // 指纹格式应为：XXXXX-XXXXX-XXXXX-XXXXX-XXXXX，其中X为字母或数字
+  const pattern = /^[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}$/i
   return pattern.test(fingerprint)
 }
 
