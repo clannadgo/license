@@ -98,6 +98,10 @@ class LicenseDLL:
         self.dll.GetLicenseData.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
         self.dll.GetLicenseData.restype = ctypes.c_char_p
         
+        # GetLicenseExpired
+        self.dll.GetLicenseExpired.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+        self.dll.GetLicenseExpired.restype = ctypes.c_int
+        
         # FreeString
         self.dll.FreeString.argtypes = [ctypes.c_char_p]
         self.dll.FreeString.restype = None
@@ -162,21 +166,72 @@ class LicenseDLL:
         Returns:
             License data as a dictionary, or None if failed.
         """
+        # 预先验证参数，避免传递无效路径
+        if not os.path.exists(public_key_path):
+            return None
+            
+        # 确保路径使用系统标准编码
         public_key_path_bytes = public_key_path.encode('utf-8')
         license_content_bytes = license_content.encode('utf-8')
         
-        result = self.dll.GetLicenseData(public_key_path_bytes, license_content_bytes)
-        if result is None:
-            return None
-        
+        # 使用try-finally确保无论如何都释放内存，防止内存泄漏
+        result = None
         try:
-            license_data_json = result.decode('utf-8')
+            # 调用DLL获取数据
+            result = self.dll.GetLicenseData(public_key_path_bytes, license_content_bytes)
+            if result is None:
+                return None
+            
+            # 安全地解码和解析JSON
+            license_data_json = result.decode('utf-8', errors='replace')
+            
+            # 检查是否包含错误信息
+            if '"error"' in license_data_json:
+                return None
+                
+            # 解析JSON数据
             license_data = json.loads(license_data_json)
             return license_data
         except (UnicodeDecodeError, json.JSONDecodeError):
+            # 处理解码或解析错误
+            return None
+        except Exception:
+            # 捕获所有其他异常，防止程序崩溃
             return None
         finally:
-            self.dll.FreeString(result)
+            # 确保无论如何都释放内存
+            if result is not None:
+                self.dll.FreeString(result)
+    
+    def get_license_expired(self, public_key_path: str, license_content: str) -> bool:
+        """
+        检查许可证是否过期
+        
+        Args:
+            public_key_path: Path to the public key file.
+            license_content: License content as a string.
+            
+        Returns:
+            True if license is expired or verification fails, False if license is valid and not expired.
+        """
+        # 预先验证参数，避免传递无效路径
+        if not os.path.exists(public_key_path):
+            return True  # 认为验证失败，返回True表示已过期
+            
+        # 确保路径使用系统标准编码
+        public_key_path_bytes = public_key_path.encode('utf-8')
+        license_content_bytes = license_content.encode('utf-8')
+        
+        try:
+            # 调用DLL的GetLicenseExpired函数
+            # 返回值说明：0 = 未过期，1 = 已过期，-1 = 验证失败
+            result = self.dll.GetLicenseExpired(public_key_path_bytes, license_content_bytes)
+            
+            # 根据返回值判断：0表示未过期，其他情况都认为已过期或验证失败
+            return result != 0
+        except Exception:
+            # 捕获所有异常，防止程序崩溃，出现异常时返回True表示已过期
+            return True
 
 
 class LicenseVerificationResult:
@@ -273,6 +328,19 @@ class LicenseUtils:
         
         return LicenseData(data_dict)
     
+    def get_license_expired(self, public_key_path: str, license_content: str) -> bool:
+        """
+        检查许可证是否过期
+        
+        Args:
+            public_key_path: Path to the public key file.
+            license_content: License content as a string.
+            
+        Returns:
+            True if license is expired or verification fails, False if license is valid and not expired.
+        """
+        return self.license_dll.get_license_expired(public_key_path, license_content)
+    
     def read_license_file(self, license_path: str) -> str:
         """
         Read license file content.
@@ -297,9 +365,5 @@ class LicenseUtils:
         Returns:
             True if license is expired, False otherwise.
         """
-        license_data = self.get_license_data(public_key_path, license_content)
-        if license_data is None:
-            return True
-        
-        import time
-        return time.time() > license_data.expires_at
+        # 使用新的get_license_expired方法代替原来的实现
+        return self.get_license_expired(public_key_path, license_content)

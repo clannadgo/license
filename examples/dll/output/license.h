@@ -98,6 +98,11 @@ extern __declspec(dllexport) char* GenerateFingerprint();
 //
 extern __declspec(dllexport) int VerifyLicense(char* publicKeyPath, char* licenseContent);
 
+// 导出函数：检查许可证是否过期
+// 返回值：0 = 未过期，1 = 已过期，-1 = 验证失败（无效的公钥或许可证）
+//
+extern __declspec(dllexport) int GetLicenseExpired(char* publicKeyPath, char* licenseContent);
+
 // 导出函数：获取许可证数据（JSON格式）
 //
 extern __declspec(dllexport) char* GetLicenseData(char* publicKeyPath, char* licenseContent);
