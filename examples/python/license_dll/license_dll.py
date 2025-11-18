@@ -104,7 +104,8 @@ class LicenseDLL:
     
     def generate_fingerprint(self) -> str:
         """
-        Generate machine fingerprint.
+        Generate machine fingerprint using the Go DLL.
+        All encoding/decoding logic is handled by the Go implementation.
         
         Returns:
             Machine fingerprint as a string.
@@ -114,7 +115,8 @@ class LicenseDLL:
             raise RuntimeError("Failed to generate fingerprint")
         
         fingerprint = result.decode('utf-8')
-        # 不调用FreeString，让CGO的垃圾回收处理
+        # 注意：在实际生产环境中应该调用FreeString释放内存
+        # 这里为了简化示例省略了，实际使用时应该添加
         # self.dll.FreeString(result)
         return fingerprint
     
@@ -211,10 +213,13 @@ class LicenseData:
 class LicenseUtils:
     """
     Utility class for license operations.
+    All core logic is handled by the Go DLL, including fingerprint generation
+    and license verification.
     Supports Windows (.dll), Linux (.so) and macOS (.dylib).
     """
     
     def __init__(self, library_path: Optional[str] = None):
+        # Initialize the DLL wrapper
         self.license_dll = LicenseDLL(library_path)
     
     def get_platform_info(self) -> str:
@@ -228,7 +233,8 @@ class LicenseUtils:
     
     def generate_fingerprint(self) -> str:
         """
-        Generate machine fingerprint.
+        Generate machine fingerprint using the Go DLL.
+        All encoding/decoding logic is handled by the Go implementation.
         
         Returns:
             Machine fingerprint as a string.
@@ -237,28 +243,29 @@ class LicenseUtils:
     
     def verify_license(self, public_key_path: str, license_content: str) -> LicenseVerificationResult:
         """
-        Verify license.
+        Verify license using the Go DLL.
+        All verification logic including fingerprint matching is handled by Go.
         
         Args:
             public_key_path: Path to the public key file.
             license_content: License content as a string.
             
         Returns:
-            LicenseVerificationResult object.
+            LicenseVerificationResult object with success status and message.
         """
         result_code, message = self.license_dll.verify_license(public_key_path, license_content)
         return LicenseVerificationResult(result_code, message)
     
     def get_license_data(self, public_key_path: str, license_content: str) -> Optional[LicenseData]:
         """
-        Get license data.
+        Get license data using the Go DLL.
         
         Args:
             public_key_path: Path to the public key file.
             license_content: License content as a string.
             
         Returns:
-            LicenseData object or None if failed.
+            LicenseData object containing license details or None if failed.
         """
         data_dict = self.license_dll.get_license_data(public_key_path, license_content)
         if data_dict is None:
@@ -281,7 +288,7 @@ class LicenseUtils:
     
     def is_license_expired(self, public_key_path: str, license_content: str) -> bool:
         """
-        Check if license is expired.
+        Check if license is expired by verifying through the Go DLL and checking timestamp.
         
         Args:
             public_key_path: Path to the public key file.
