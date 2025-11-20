@@ -5,15 +5,12 @@
 ## 目录结构
 
 - `cmd/` - 命令行工具
-  - `gin/` - 后端服务主程序
-  - `gen_license/` - 许可证生成工具
-  - `gen_fingerprint/` - 机器指纹生成工具
-  - `build_dll/` - DLL构建工具
+  - `gin/` - 后端服务主程序  -- 主体程序，后续用于管理许可证，请妥善保管您的私钥，公钥需要发放给客户
 - `examples/` - 示例代码
   - `dll/` - 多平台共享库示例
   - `java/` - Java SDK示例
   - `python/` - Python SDK示例
-- `frontend/` - 前端Vue.js应用
+- `frontend/` - 前端Vue.js应用-- npm install && npm run dev启动，或者进行打包部署
 - `internal/` - 内部包
   - `config/` - 配置管理
   - `database/` - 数据库操作
@@ -27,8 +24,7 @@
 首先，需要生成RSA密钥对用于签名和验证许可证：
 
 ```bash
-openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out private.pem
-openssl rsa -pubout -in private.pem -out public.pem
+key_generate.bat  生成公钥和私钥
 ```
 
 ### 2. 启动后端服务
@@ -51,67 +47,12 @@ npm run dev
 
 ## 系统使用说明
 
-### 许可证管理
-
-1. **生成机器指纹**
-   ```bash
-   go run cmd/gen_fingerprint/main.go
-   ```
-
-2. **生成许可证**
-   ```bash
-   go run cmd/gen_license/main.go -fingerprint <机器指纹> -customer <客户名称> -expires <过期时间>
-   ```
-
-3. **验证许可证**
-   - 通过API接口验证
-   - 使用SDK验证
-
-### API接口
-
-#### 生成机器指纹
-```
-GET /api/fingerprint
-```
-
-#### 生成许可证
-```
-POST /api/license
-Content-Type: application/json
-
-{
-  "fingerprint": "机器指纹",
-  "customer": "客户名称",
-  "expires": "过期时间戳"
-}
-```
-
-#### 验证许可证
-```
-POST /api/verify
-Content-Type: application/json
-
-{
-  "license": "许可证内容",
-  "publicKey": "公钥内容"
-}
-```
-
 ### SDK使用
 
 #### Go SDK
 
 ```go
-import "github.com/your-repo/license/internal/license"
-
-// 验证许可证
-isValid, err := license.VerifyLicense(licenseContent, publicKeyPath)
-if err != nil {
-    // 处理错误
-}
-if !isValid {
-    // 许可证无效
-}
+参考 examples/go/example_usage.go
 ```
 
 #### 多平台共享库
@@ -131,58 +72,24 @@ chmod +x build_all.sh
 ./build_all.sh
 ```
 
-构建完成后，`output` 目录将包含以下文件：
-- Windows: `license_windows_amd64.dll`, `license_windows_amd64.h`
-- Linux: `license_linux_amd64.so`, `license_linux_amd64.h`
-- Linux ARM64: `license_linux_arm64.so`, `license_linux_arm64.h`
+构建完成后，`output` 目录将包含对应编译好的dll文件，该dll文件用于给非go语言的后端服务集成license使用
 
 #### C/C++ SDK
 
 ```c
-#include "license_windows_amd64.h" // 或对应平台的头文件
-
-// 生成机器指纹
-char* fingerprint = GenerateFingerprint();
-
-// 验证许可证
-int result = VerifyLicense("public.pem", "license_content.lic");
-
-// 获取许可证数据
-char* data = GetLicenseData("public.pem", "license_content.lic");
-
-// 释放字符串内存
-FreeString(fingerprint);
-FreeString(data);
+暂未调试，后续会调试并更新
 ```
 
 #### Java SDK
 
 ```java
-import com.license.LicenseManager;
-
-// 初始化许可证管理器
-LicenseManager manager = new LicenseManager("public.pem");
-
-// 验证许可证
-boolean isValid = manager.verifyLicense("license_content.lic");
-
-// 获取许可证数据
-LicenseData data = manager.getLicenseData("license_content.lic");
+暂未调试，后续会调试并更新
 ```
 
 #### Python SDK
 
 ```python
-from license_sdk import LicenseManager
-
-# 初始化许可证管理器
-manager = LicenseManager("public.pem")
-
-# 验证许可证
-is_valid = manager.verify_license("license_content.lic")
-
-# 获取许可证数据
-data = manager.get_license_data("license_content.lic")
+参考 examples/python/example_usage.py
 ```
 
 ## 配置说明
