@@ -1,11 +1,18 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
+import LanguageSwitch from './components/LanguageSwitch.vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 </script>
 
 <template>
   <header>
     <div class="wrapper">
-      <h1 class="title">License管理系统</h1>
+      <h1 class="title">{{ t('common.licenseManagement') }}</h1>
+      <div class="header-right">
+        <LanguageSwitch />
+      </div>
     </div>
   </header>
 
@@ -31,6 +38,14 @@ header {
   width: 100%;
   margin: 0;
   padding: 0 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
 }
 
 nav {

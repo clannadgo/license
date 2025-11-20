@@ -1,13 +1,13 @@
 <template>
   <div class="license-container">
     <div class="header">
-      <h1>License管理系统</h1>
+      <h1>{{ $t('common.licenseManagement') }}</h1>
     </div>
     
     <div class="license-actions">
-      <el-button type="primary" @click="showAddDialog = true">新增License</el-button>
-      <el-button type="success" @click="generateFingerprint">测试生成机器码</el-button>
-      <el-button @click="refreshData">刷新数据</el-button>
+      <el-button type="primary" @click="showAddDialog = true">{{ $t('common.addLicense') }}</el-button>
+      <el-button type="success" @click="generateFingerprint">{{ $t('common.testFingerprint') }}</el-button>
+      <el-button @click="refreshData">{{ $t('common.refresh') }}</el-button>
     </div>
 
 
@@ -22,60 +22,55 @@
         <!-- License列表 -->
         <div class="license-table">
           <div class="table-header">
-            <h3>License列表</h3>
+            <h3>{{ $t('license.list') }}</h3>
             <!-- 搜索区域 -->
             <div class="search-container">
               <el-input
                 v-model="searchKeyword"
-                placeholder="请输入客户名称进行搜索"
+                :placeholder="$t('common.searchPlaceholder')"
                 class="search-input"
                 clearable
                 @keyup.enter="handleSearch"
                 @clear="handleSearch"
               >
                 <template #append>
-                  <el-button @click="handleSearch" type="primary">搜索</el-button>
+                  <el-button @click="handleSearch" type="primary">{{ $t('common.search') }}</el-button>
                 </template>
               </el-input>
             </div>
           </div>
           <div class="table-container">
             <el-table :data="licenseList" style="width: 100%" table-layout="fixed">
-              <el-table-column label="序号" width="80">
-                <template #default="scope">
-                  {{ (currentPage - 1) * pageSize + scope.$index + 1 }}
-                </template>
-              </el-table-column>
-              <el-table-column prop="customer" label="客户名称" min-width="120" />
-              <el-table-column prop="fingerprint" label="机器码" min-width="150" />
-              <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-              <el-table-column prop="activated_at" label="激活时间" min-width="150">
+              <el-table-column :label="$t('common.customer')" min-width="120" />
+              <el-table-column prop="fingerprint" :label="$t('common.fingerprint')" min-width="150" />
+              <el-table-column prop="description" :label="$t('common.description')" min-width="200" show-overflow-tooltip />
+              <el-table-column prop="activated_at" :label="$t('common.activatedAt')" min-width="150">
                 <template #default="scope">
                   {{ formatDate(scope.row.activated_at) }}
                 </template>
               </el-table-column>
-              <el-table-column prop="expires_at" label="过期时间" min-width="150">
+              <el-table-column prop="expires_at" :label="$t('common.expiresAt')" min-width="150">
                 <template #default="scope">
                   {{ formatDate(scope.row.expires_at) }}
                 </template>
               </el-table-column>
-              <el-table-column prop="is_active" label="状态" width="100">
+              <el-table-column prop="is_active" :label="$t('common.status')" width="100">
                 <template #default="scope">
                   <el-tag :type="scope.row.is_active ? 'success' : 'danger'">
-                    {{ scope.row.is_active ? '已激活' : '已过期' }}
+                    {{ scope.row.is_active ? $t('common.active') : $t('common.expired') }}
                   </el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="200">
+              <el-table-column :label="$t('common.operations')" width="200">
                 <template #default="scope">
                   <el-button size="small" type="primary" @click="downloadLicense(scope.row.id)">
-                    下载
+                    {{ $t('common.download') }}
                   </el-button>
                   <el-button size="small" type="warning" @click="openEditDialog(scope.row)">
-                    编辑
+                    {{ $t('common.edit') }}
                   </el-button>
                   <el-button size="small" type="danger" @click="deleteLicense(scope.row.id)">
-                    删除
+                    {{ $t('common.delete') }}
                   </el-button>
                 </template>
               </el-table-column>
@@ -89,9 +84,6 @@
               :page-sizes="[10, 20, 50, 100]"
               :total="total"
               layout="total, sizes, prev, pager, next, jumper"
-              prev-text="上一页"
-              next-text="下一页"
-              :pager-count="7"
               @size-change="handleSizeChange"
               @current-change="handleCurrentChange"
             />
@@ -101,12 +93,12 @@
     </div>
 
     <!-- 新增License对话框 -->
-    <el-dialog v-model="showAddDialog" title="新增License" width="600px">
+    <el-dialog v-model="showAddDialog" :title="$t('common.addLicense')" width="600px">
       <el-form :model="newLicense" label-width="80px">
-        <el-form-item label="客户名称" required>
-          <el-input v-model="newLicense.customer" placeholder="请输入客户名称" />
+        <el-form-item :label="$t('common.customer')" required>
+          <el-input v-model="newLicense.customer" :placeholder="$t('common.enterCustomer')" />
         </el-form-item>
-        <el-form-item label="机器码" required>
+        <el-form-item :label="$t('common.fingerprint')" required>
           <el-tooltip
             v-model="showFingerprintTooltip"
             :content="fingerprintTooltipContent"
@@ -115,75 +107,75 @@
           >
             <el-input 
               v-model="newLicense.fingerprint" 
-              placeholder="请输入机器码" 
+              :placeholder="$t('common.enterFingerprint')" 
               @blur="handleFingerprintBlur"
               :class="{ 'fingerprint-invalid': showFingerprintValidation && newLicense.fingerprint && !validateFingerprintFormat(newLicense.fingerprint) }"
             />
           </el-tooltip>
           <div style="color: #909399; font-size: 12px; margin-top: 5px;">
-            正确格式应为XXXXX-XXXXX-XXXXX-XXXXX-XXXXX（5组5位字母或数字）
+            {{ $t('common.fingerprintFormatTip') }}
           </div>
         </el-form-item>
-        <el-form-item label="有效期">
+        <el-form-item :label="$t('common.validityPeriod')">
           <div class="validity-container">
             <div class="validity-row">
               <div class="validity-item">
-                <el-form-item label="天数" prop="validityDays">
+                <el-form-item :label="$t('common.days')" prop="validityDays">
                   <el-input-number v-model="newLicense.validityDays" :min="0" :max="3650" style="width: 100%" />
                 </el-form-item>
               </div>
               <div class="validity-item">
-                <el-form-item label="小时" prop="validityHours">
+                <el-form-item :label="$t('common.hours')" prop="validityHours">
                   <el-input-number v-model="newLicense.validityHours" :min="0" :max="23" style="width: 100%" />
                 </el-form-item>
               </div>
             </div>
             <div class="validity-row">
               <div class="validity-item">
-                <el-form-item label="分钟" prop="validityMinutes">
+                <el-form-item :label="$t('common.minutes')" prop="validityMinutes">
                   <el-input-number v-model="newLicense.validityMinutes" :min="0" :max="59" style="width: 100%" />
                 </el-form-item>
               </div>
               <div class="validity-item">
-                <el-form-item label="秒" prop="validitySeconds">
+                <el-form-item :label="$t('common.seconds')" prop="validitySeconds">
                   <el-input-number v-model="newLicense.validitySeconds" :min="0" :max="59" style="width: 100%" />
                 </el-form-item>
               </div>
             </div>
           </div>
           <div style="color: #909399; font-size: 12px; margin-top: 5px;">
-            至少需要设置一个时间单位
+            {{ $t('common.validityPeriodTip') }}
           </div>
         </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="newLicense.description" type="textarea" rows="4" placeholder="请输入描述内容" maxlength="300" show-word-limit />
+        <el-form-item :label="$t('common.description')">
+          <el-input v-model="newLicense.description" type="textarea" rows="4" :placeholder="$t('common.enterDescription')" maxlength="300" show-word-limit />
         </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="showAddDialog = false; showFingerprintValidation = false; showFingerprintTooltip = false">取消</el-button>
-          <el-button type="primary" @click="addLicense">确定</el-button>
+          <el-button @click="showAddDialog = false; showFingerprintValidation = false; showFingerprintTooltip = false">{{ $t('common.cancel') }}</el-button>
+          <el-button type="primary" @click="addLicense">{{ $t('common.confirm') }}</el-button>
         </span>
       </template>
     </el-dialog>
 
     <!-- 编辑License对话框 -->
-    <el-dialog v-model="showEditDialog" title="编辑License" width="600px">
+    <el-dialog v-model="showEditDialog" :title="$t('common.editLicense')" width="600px">
       <el-form :model="editLicense" label-width="80px">
-        <el-form-item label="客户名称" required>
-          <el-input v-model="editLicense.customer" placeholder="请输入客户名称" />
+        <el-form-item :label="$t('common.customer')" required>
+          <el-input v-model="editLicense.customer" :placeholder="$t('common.enterCustomer')" />
         </el-form-item>
-        <el-form-item label="机器码">
+        <el-form-item :label="$t('common.fingerprint')">
           <el-input v-model="editLicense.fingerprint" readonly disabled />
         </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="editLicense.description" type="textarea" rows="4" placeholder="请输入描述内容" maxlength="300" show-word-limit />
+        <el-form-item :label="$t('common.description')">
+          <el-input v-model="editLicense.description" type="textarea" rows="4" :placeholder="$t('common.enterDescription')" maxlength="300" show-word-limit />
         </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="showEditDialog = false">取消</el-button>
-          <el-button type="primary" @click="updateLicense">确定</el-button>
+          <el-button @click="showEditDialog = false">{{ $t('common.cancel') }}</el-button>
+          <el-button type="primary" @click="updateLicense">{{ $t('common.update') }}</el-button>
         </span>
       </template>
     </el-dialog>
