@@ -14,7 +14,7 @@ from flask import Flask, request, jsonify, g
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import only the core functionality from license_dll
-from license_dll.license_dll import LicenseUtils, LicenseVerificationResult
+from license_dll import LicenseUtils, LicenseVerificationResult
 
 # Default paths
 DEFAULT_PUBLIC_KEY_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "keys", "public.pem")
@@ -84,28 +84,36 @@ class LicenseMiddleware:
             # Read license file
             license_content = self.license_utils.read_license_file(self.license_file_path)
             
-            # Verify license
-            result = self.license_utils.verify_license(self.public_key_path, license_content)
-            if not result.success:
-                return jsonify({"error": f"许可证验证失败: {result.message}"}), 401
-            
-            # Get license data for additional checks
+            # 使用合并后的get_license_data函数进行验证和获取数据
             license_data = self.license_utils.get_license_data(self.public_key_path, license_content)
             if not license_data:
-                return jsonify({"error": "无法解析许可证数据"}), 401
+                return jsonify({"error": "无法获取许可证数据"}), 401
             
-            # Check if license is expired
+            # 检查验证结果
+            if isinstance(license_data, dict) and "valid" in license_data:
+                # 新的数据结构：包含valid和data字段
+                if not license_data.get("valid", False):
+                    error_msg = license_data.get("error", "许可证验证失败")
+                    return jsonify({"error": f"许可证验证失败: {error_msg}"}), 401
+                
+                # 验证成功，获取许可证数据
+                license_info = license_data.get("data", {})
+            else:
+                # 旧的数据结构：直接返回LicenseData对象
+                license_info = license_data
+            
+            # 检查许可证是否过期
             if self.license_utils.is_license_expired(self.public_key_path, license_content):
                 return jsonify({
                     "error": "许可证已过期",
-                    "valid_until": license_data.expires_at
+                    "valid_until": license_info.expires_at if hasattr(license_info, 'expires_at') else "unknown"
                 }), 401
             
             # Store license info in Flask's g object for later use
             g.license = {
-                "customer": license_data.customer,
-                "expires_at": license_data.expires_at,
-                "fingerprint": license_data.fingerprint
+                "customer": license_info.customer if hasattr(license_info, 'customer') else "",
+                "expires_at": license_info.expires_at if hasattr(license_info, 'expires_at') else 0,
+                "fingerprint": license_info.fingerprint if hasattr(license_info, 'fingerprint') else ""
             }
             
         except FileNotFoundError as e:

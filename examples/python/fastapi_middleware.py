@@ -13,7 +13,7 @@ from typing import Optional, Callable, Dict, Any
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import only the core functionality from license_dll
-from license_dll.license_dll import LicenseUtils, LicenseVerificationResult
+from license_dll import LicenseUtils, LicenseVerificationResult
 
 # Default paths - these should be configured based on your application's needs
 DEFAULT_PUBLIC_KEY_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "keys", "public.pem")
@@ -62,37 +62,45 @@ def create_license_middleware(
             # Read license file
             license_content = license_utils.read_license_file(license_file_path)
             
-            # Verify license
-            result = license_utils.verify_license(public_key_path, license_content)
-            if not result.success:
-                return JSONResponse(
-                    status_code=401,
-                    content={"error": f"许可证验证失败: {result.message}"}
-                )
-            
-            # Get license data for additional checks
+            # 使用合并后的get_license_data函数进行验证和获取数据
             license_data = license_utils.get_license_data(public_key_path, license_content)
             if not license_data:
                 return JSONResponse(
                     status_code=401,
-                    content={"error": "无法解析许可证数据"}
+                    content={"error": "无法获取许可证数据"}
                 )
             
-            # Check if license is expired
+            # 检查验证结果
+            if isinstance(license_data, dict) and "valid" in license_data:
+                # 新的数据结构：包含valid和data字段
+                if not license_data.get("valid", False):
+                    error_msg = license_data.get("error", "许可证验证失败")
+                    return JSONResponse(
+                        status_code=401,
+                        content={"error": f"许可证验证失败: {error_msg}"}
+                    )
+                
+                # 验证成功，获取许可证数据
+                license_info = license_data.get("data", {})
+            else:
+                # 旧的数据结构：直接返回LicenseData对象
+                license_info = license_data
+            
+            # 检查许可证是否过期
             if license_utils.is_license_expired(public_key_path, license_content):
                 return JSONResponse(
                     status_code=401,
                     content={
                         "error": "许可证已过期",
-                        "valid_until": license_data.expires_at
+                        "valid_until": license_info.expires_at if hasattr(license_info, 'expires_at') else "unknown"
                     }
                 )
             
             # Store license info in request state for later use
             request.state.license = {
-                "customer": license_data.customer,
-                "expires_at": license_data.expires_at,
-                "fingerprint": license_data.fingerprint
+                "customer": license_info.customer if hasattr(license_info, 'customer') else "",
+                "expires_at": license_info.expires_at if hasattr(license_info, 'expires_at') else 0,
+                "fingerprint": license_info.fingerprint if hasattr(license_info, 'fingerprint') else ""
             }
             
             # Continue to the next handler

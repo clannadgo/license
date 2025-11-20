@@ -90,11 +90,7 @@ class LicenseDLL:
         self.dll.GenerateFingerprint.argtypes = []
         self.dll.GenerateFingerprint.restype = ctypes.c_char_p
         
-        # VerifyLicense
-        self.dll.VerifyLicense.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
-        self.dll.VerifyLicense.restype = ctypes.c_int
-        
-        # GetLicenseData
+        # GetLicenseData (now includes verification)
         self.dll.GetLicenseData.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
         self.dll.GetLicenseData.restype = ctypes.c_char_p
         
@@ -137,23 +133,27 @@ class LicenseDLL:
             - result_code: 0 for success, non-zero for failure
             - message: Result message
         """
-        public_key_path_bytes = public_key_path.encode('utf-8')
-        license_content_bytes = license_content.encode('utf-8')
+        # 现在通过get_license_data来验证许可证，避免重复调用DLL
+        license_data = self.get_license_data(public_key_path, license_content)
         
-        result_code = self.dll.VerifyLicense(public_key_path_bytes, license_content_bytes)
+        if license_data is None:
+            # 如果获取数据失败，返回验证失败
+            return 2, "Invalid license"
         
-        # Map result codes to messages
-        messages = {
-            0: "Success",
-            1: "Invalid public key",
-            2: "Invalid license",
-            3: "License expired",
-            4: "Fingerprint mismatch",
-            5: "Internal error"
-        }
+        # 检查是否包含错误信息
+        if "error" in license_data:
+            error_msg = license_data.get("error", "Unknown error")
+            if "expired" in error_msg.lower():
+                return 3, "License expired"
+            elif "fingerprint" in error_msg.lower():
+                return 4, "Fingerprint mismatch"
+            elif "public key" in error_msg.lower():
+                return 1, "Invalid public key"
+            else:
+                return 2, f"License verification failed: {error_msg}"
         
-        message = messages.get(result_code, f"Unknown error code: {result_code}")
-        return result_code, message
+        # 验证成功
+        return 0, "Success"
     
     def get_license_data(self, public_key_path: str, license_content: str) -> Optional[Dict[str, Any]]:
         """
@@ -174,34 +174,33 @@ class LicenseDLL:
         public_key_path_bytes = public_key_path.encode('utf-8')
         license_content_bytes = license_content.encode('utf-8')
         
-        # 使用try-finally确保无论如何都释放内存，防止内存泄漏
-        result = None
         try:
-            # 调用DLL获取数据
-            result = self.dll.GetLicenseData(public_key_path_bytes, license_content_bytes)
-            if result is None:
+            # 调用DLL获取数据，使用ctypes的自动内存管理
+            # 注意：这里不再手动调用FreeString，让ctypes自动管理内存
+            result_ptr = self.dll.GetLicenseData(public_key_path_bytes, license_content_bytes)
+            if not result_ptr:
                 return None
             
-            # 安全地解码和解析JSON
-            license_data_json = result.decode('utf-8', errors='replace')
+            # 使用ctypes的string_at函数安全地获取字符串内容
+            # 这会自动复制数据到Python管理的内存中
+            license_data_json = ctypes.string_at(result_ptr).decode('utf-8', errors='replace')
             
-            # 检查是否包含错误信息
-            if '"error"' in license_data_json:
-                return None
-                
             # 解析JSON数据
             license_data = json.loads(license_data_json)
-            return license_data
+            
+            # 检查验证结果
+            if not license_data.get('valid', False):
+                # 验证失败，返回包含错误信息的字典
+                return license_data
+                
+            # 验证成功，返回许可证数据
+            return license_data.get('data', {})
         except (UnicodeDecodeError, json.JSONDecodeError):
             # 处理解码或解析错误
             return None
         except Exception:
             # 捕获所有其他异常，防止程序崩溃
             return None
-        finally:
-            # 确保无论如何都释放内存
-            if result is not None:
-                self.dll.FreeString(result)
     
     def get_license_expired(self, public_key_path: str, license_content: str) -> bool:
         """

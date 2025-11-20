@@ -399,19 +399,7 @@ func GenerateFingerprint() *C.char {
 	return C.CString(fingerprint)
 }
 
-// 导出函数：验证许可证
-//
-//export VerifyLicense
-func VerifyLicense(publicKeyPath, licenseContent *C.char) C.int {
-	pubKeyPath := C.GoString(publicKeyPath)
-	license := C.GoString(licenseContent)
-
-	code, _, err := verifyLicense(pubKeyPath, license)
-	if err != nil {
-		// 错误已通过code返回
-	}
-	return C.int(code)
-}
+// VerifyLicense函数已合并到GetLicenseData中，不再单独导出
 
 // 导出函数：检查许可证是否过期
 // 返回值：0 = 未过期，1 = 已过期，-1 = 验证失败（无效的公钥或许可证）
@@ -426,7 +414,7 @@ func GetLicenseExpired(publicKeyPath, licenseContent *C.char) C.int {
 		// 如果有错误发生，返回-1表示验证失败
 		return C.int(-1)
 	}
-	
+
 	// 根据验证结果返回相应的值
 	if code == ErrorLicenseExpired {
 		return C.int(1) // 已过期
@@ -441,24 +429,51 @@ func GetLicenseExpired(publicKeyPath, licenseContent *C.char) C.int {
 //
 //export GetLicenseData
 func GetLicenseData(publicKeyPath, licenseContent *C.char) *C.char {
-	pubKeyPath := C.GoString(publicKeyPath)
-	license := C.GoString(licenseContent)
+	// 将C字符串转换为Go字符串
+	publicKeyPathStr := C.GoString(publicKeyPath)
+	licenseContentStr := C.GoString(licenseContent)
 
-	code, licenseData, err := verifyLicense(pubKeyPath, license)
-	if err != nil && code != ErrorFingerprintMismatch {
-		return C.CString(fmt.Sprintf(`{"error": "%s"}`, err.Error()))
+	// 首先验证许可证
+	result, licenseData, err := verifyLicense(publicKeyPathStr, licenseContentStr)
+
+	response := make(map[string]interface{})
+
+	if err != nil || result != 0 {
+		// 验证失败，返回错误信息
+		errorMsg := ""
+		if err != nil {
+			errorMsg = err.Error()
+		} else {
+			switch result {
+			case 1:
+				errorMsg = "Invalid public key"
+			case 2:
+				errorMsg = "Invalid license"
+			case 3:
+				errorMsg = "License expired"
+			case 4:
+				errorMsg = "Fingerprint mismatch"
+			default:
+				errorMsg = "Unknown error"
+			}
+		}
+		response["error"] = errorMsg
+		response["valid"] = false
+	} else {
+		// 验证成功，返回许可证数据
+		response["valid"] = true
+		response["data"] = licenseData
 	}
 
-	if licenseData == nil {
-		return C.CString(`{"error": "no license data"}`)
-	}
-
-	// 转换为JSON
-	jsonData, err := json.Marshal(licenseData)
+	// 将响应数据转换为JSON字符串
+	jsonData, err := json.Marshal(response)
 	if err != nil {
-		return C.CString(fmt.Sprintf(`{"error": "%s"}`, err.Error()))
+		// 返回JSON序列化错误
+		errorMsg := fmt.Sprintf("{\"error\": \"JSON serialization error: %s\", \"valid\": false}", err.Error())
+		return C.CString(errorMsg)
 	}
 
+	// 返回JSON字符串
 	return C.CString(string(jsonData))
 }
 
