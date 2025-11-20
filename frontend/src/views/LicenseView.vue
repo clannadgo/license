@@ -93,8 +93,8 @@
     </div>
 
     <!-- 新增License对话框 -->
-    <el-dialog v-model="showAddDialog" :title="$t('common.addLicense')" width="600px">
-      <el-form :model="newLicense" label-width="80px">
+    <el-dialog v-model="showAddDialog" :title="$t('common.addLicense')" width="700px">
+      <el-form :model="newLicense" label-width="120px">
         <el-form-item :label="$t('common.customer')" required>
           <el-input v-model="newLicense.customer" :placeholder="$t('common.enterCustomer')" />
         </el-form-item>
@@ -160,8 +160,8 @@
     </el-dialog>
 
     <!-- 编辑License对话框 -->
-    <el-dialog v-model="showEditDialog" :title="$t('common.editLicense')" width="600px">
-      <el-form :model="editLicense" label-width="80px">
+    <el-dialog v-model="showEditDialog" :title="$t('common.editLicense')" width="700px">
+      <el-form :model="editLicense" label-width="120px">
         <el-form-item :label="$t('common.customer')" required>
           <el-input v-model="editLicense.customer" :placeholder="$t('common.enterCustomer')" />
         </el-form-item>

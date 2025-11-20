@@ -59,8 +59,22 @@ const handleLanguageChange = (lang: string) => {
   i18nStore.switchLanguage(lang)
   locale.value = lang
   
-  // 刷新页面以应用新的Element Plus语言包
-  window.location.reload()
+  // 动态更新Element Plus的语言包
+  const elementLocaleMap = {
+    zhCN: () => import('element-plus/dist/locale/zh-cn.mjs'),
+    enUS: () => import('element-plus/dist/locale/en.mjs'),
+    jaJP: () => import('element-plus/dist/locale/ja.mjs')
+  }
+  
+  if (elementLocaleMap[lang as keyof typeof elementLocaleMap]) {
+    elementLocaleMap[lang as keyof typeof elementLocaleMap]().then(module => {
+      // 更新Element Plus的locale配置
+      const elementPlus = (window as any).$ELEMENT
+      if (elementPlus) {
+        elementPlus.locale = module.default
+      }
+    })
+  }
 }
 </script>
 

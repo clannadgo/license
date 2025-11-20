@@ -49,4 +49,9 @@ app.use(ElementPlus, {
   locale: elementLocaleMap[currentLanguage] || zhCn,
 })
 
+// 将Element Plus配置暴露到全局，以便动态切换语言
+app.config.globalProperties.$ELEMENT = {
+  locale: elementLocaleMap[currentLanguage] || zhCn
+}
+
 app.mount('#app')
